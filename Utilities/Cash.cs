@@ -22,7 +22,7 @@ namespace Utilities
         }
 
         private readonly int _capacity;
-        private readonly Dictionary<TKey, Item> Items = new Dictionary<TKey, Item>();
+        private readonly Dictionary<TKey, Item> Items = new();
 
         public Cash(int capacity=100)
         {
@@ -31,9 +31,8 @@ namespace Utilities
         }
         public TValue Get(TKey key)
         {
-            Item item;
-            if(!Items.TryGetValue(key, out item))
-                return default(TValue);
+            if(!Items.TryGetValue(key, out var item))
+                return default;
 
             item.utcLastGetTime = DateTime.UtcNow;
             return item.Value;

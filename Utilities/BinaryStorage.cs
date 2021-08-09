@@ -106,7 +106,7 @@ namespace Utilities
             }
         }
 
-        readonly SafeList<UpdateFlag> ReaderRefreshFlags = new SafeList<UpdateFlag>();
+        readonly SafeList<UpdateFlag> ReaderRefreshFlags = new();
         public class Reader : IBinaryStorageReader<TBar>
         {
             private readonly BinaryStorage<TBar, TBarAdaptor> _owner;
@@ -122,7 +122,7 @@ namespace Utilities
 
             private readonly UpdateFlag UpdateFlag;
 
-            private readonly Cash<Segment,TBar[]> _cash=new Cash<Segment, TBar[]>();
+            private readonly Cash<Segment,TBar[]> _cash=new();
             public Reader(BinaryStorage<TBar, TBarAdaptor> owner)
             {
                 _owner = owner;
@@ -337,11 +337,11 @@ namespace Utilities
         public int MaxAdditionsBeforeFlush { get; set; }
 
         // актуальный список сегментов
-        private readonly List<Segment> mSegments = new List<Segment>();
+        private readonly List<Segment> mSegments = new();
         // все сегменты, включая удаленные при вводе корректировок
-        private readonly List<Segment> mAllSegments = new List<Segment>();
+        private readonly List<Segment> mAllSegments = new();
         // буффер новых баров на запись
-        private readonly List<TBar> Accumulator = new List<TBar>();
+        private readonly List<TBar> Accumulator = new();
         // текущий недозаписанный сегмент
         private Segment CurrentSegment;
 
@@ -485,9 +485,7 @@ namespace Utilities
                 int numBars = barsSize / recordLen; // !округление вниз
 
                 // считываем шапку
-                DateTime creationTime, invalidationTime;
-                int fixedNumBars;
-                ReadSegmentTitle(br, out creationTime, out invalidationTime, out fixedNumBars);
+                ReadSegmentTitle(br, out var creationTime, out var invalidationTime, out var fixedNumBars);
 
                 if (fixedNumBars > numBars) 
                 {
@@ -958,7 +956,7 @@ namespace Utilities
         }
         private List<TBar> LoadSegmentData(Segment s)
         {
-            return new List<TBar>(s.LoadSegment(mFileStream, br, BarAdaptor));
+            return new(s.LoadSegment(mFileStream, br, BarAdaptor));
         }
         private void InvalidateSegment(long corrMarker, Segment segment)
         {

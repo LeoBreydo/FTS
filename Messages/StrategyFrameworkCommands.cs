@@ -163,11 +163,12 @@ namespace Messages
         public long ExecAmount;
         public double ExecQuote;
         //public DateTime ExecTime;
-        public TimeStamp ExecTime;
+        public DateTime ExecTime;
         public string ClOrderId;
         public long RestOrderedAmountBeforeApplyFill;
         public Cmd_ApplyFill() : base(MessageNumbers.Cmd_ApplyFill) { }
-        public Cmd_ApplyFill(string userName, long strategyID, long execAmount, double execQuote, TimeStamp execTime, string clOrderId, long restOrderedAmountBeforeApplyFill)
+        public Cmd_ApplyFill(string userName, long strategyID, long execAmount, 
+            double execQuote, DateTime execTime, string clOrderId, long restOrderedAmountBeforeApplyFill)
             : base(MessageNumbers.Cmd_ApplyFill)
         {
             UserName = userName;
@@ -189,47 +190,47 @@ namespace Messages
     /// <summary>
     /// The command from client to change TradingAmount and/or stop/target protections for specified strategy
     /// </summary>
-    public class Cmd_ApplyStrategyParameters : BaseMessage
-    {
-        public string UserName;
-        public long StrategyID;
-        public long TradingAmount;
-        public double TakeProfitDelta;
-        public double InitialStopDelta;
-        public double TrailingDelta;
-        public double ActivationProfit;
-        [JsonConverter(typeof(StringEnumConverter))]
-        public DynamicalRestrictionState DynamicalTargetState;
-        [JsonConverter(typeof(StringEnumConverter))]
-        public DynamicalRestrictionState DynamicalStopState;
-
-        public bool DisableStrategyByUser;
-
-        public Cmd_ApplyStrategyParameters() : base(MessageNumbers.Cmd_ApplyStrategyParameters) { }
-        public Cmd_ApplyStrategyParameters(string userName, long strategyID, long tradingAmount, double takeProfitDelta, double initialStopDelta,
-                            double trailingDelta, double activationProfit,
-            DynamicalRestrictionState dynamicalTargetState, DynamicalRestrictionState dynamicalStopState, bool disableStrategyByUser)
-            : base(MessageNumbers.Cmd_ApplyStrategyParameters)
-        {
-            UserName = userName;
-            StrategyID = strategyID;
-            TradingAmount = tradingAmount;
-            TakeProfitDelta = takeProfitDelta;
-            InitialStopDelta = initialStopDelta;
-            TrailingDelta = trailingDelta;
-            ActivationProfit = activationProfit;
-            DynamicalTargetState = dynamicalTargetState;
-            DynamicalStopState = dynamicalStopState;
-            DisableStrategyByUser = disableStrategyByUser;
-        }
-        //public override string ToString()
-        //{
-        //    return
-        //        string.Format(
-        //            "Cmd_ApplyStrategyParameters, UserName={0}, StrategyID={1}, TradingAmount={2}, TakeProfitDelta={3}, InitialStopDelta={4}, TrailingDelta={5}, ActivationProfit={6}, DynamicalTargetState={7}, DynamicalStopState={8}",
-        //            UserName, StrategyID, TradingAmount, TakeProfitDelta, InitialStopDelta, TrailingDelta, ActivationProfit, DynamicalTargetState, DynamicalStopState);
-        //}
-    }
+    // public class Cmd_ApplyStrategyParameters : BaseMessage
+    // {
+    //     public string UserName;
+    //     public long StrategyID;
+    //     public long TradingAmount;
+    //     public double TakeProfitDelta;
+    //     public double InitialStopDelta;
+    //     public double TrailingDelta;
+    //     public double ActivationProfit;
+    //     [JsonConverter(typeof(StringEnumConverter))]
+    //     public DynamicalRestrictionState DynamicalTargetState;
+    //     [JsonConverter(typeof(StringEnumConverter))]
+    //     public DynamicalRestrictionState DynamicalStopState;
+    //
+    //     public bool DisableStrategyByUser;
+    //
+    //     public Cmd_ApplyStrategyParameters() : base(MessageNumbers.Cmd_ApplyStrategyParameters) { }
+    //     public Cmd_ApplyStrategyParameters(string userName, long strategyID, long tradingAmount, double takeProfitDelta, double initialStopDelta,
+    //                         double trailingDelta, double activationProfit,
+    //         DynamicalRestrictionState dynamicalTargetState, DynamicalRestrictionState dynamicalStopState, bool disableStrategyByUser)
+    //         : base(MessageNumbers.Cmd_ApplyStrategyParameters)
+    //     {
+    //         UserName = userName;
+    //         StrategyID = strategyID;
+    //         TradingAmount = tradingAmount;
+    //         TakeProfitDelta = takeProfitDelta;
+    //         InitialStopDelta = initialStopDelta;
+    //         TrailingDelta = trailingDelta;
+    //         ActivationProfit = activationProfit;
+    //         DynamicalTargetState = dynamicalTargetState;
+    //         DynamicalStopState = dynamicalStopState;
+    //         DisableStrategyByUser = disableStrategyByUser;
+    //     }
+    //     //public override string ToString()
+    //     //{
+    //     //    return
+    //     //        string.Format(
+    //     //            "Cmd_ApplyStrategyParameters, UserName={0}, StrategyID={1}, TradingAmount={2}, TakeProfitDelta={3}, InitialStopDelta={4}, TrailingDelta={5}, ActivationProfit={6}, DynamicalTargetState={7}, DynamicalStopState={8}",
+    //     //            UserName, StrategyID, TradingAmount, TakeProfitDelta, InitialStopDelta, TrailingDelta, ActivationProfit, DynamicalTargetState, DynamicalStopState);
+    //     //}
+    // }
 
 
    

@@ -4,7 +4,6 @@ namespace CommonStructures
     {
         Flat = 0,
         Long,
-        Short,
-        Unknown
+        Short
     }
 }

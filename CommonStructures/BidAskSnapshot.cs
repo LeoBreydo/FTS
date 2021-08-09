@@ -29,7 +29,7 @@ namespace CommonStructures
         }
         public static BidAskSnapshot MakeNotTradable(long brokerID, string symbol)
         {
-            return new BidAskSnapshot(brokerID, symbol, 0, 0, DateTime.MinValue);
+            return new(brokerID, symbol, 0, 0, DateTime.MinValue);
         }
         public static BidAskSnapshot[] DeseializeFromString(string serializedSnapshotsList)
         {
@@ -47,17 +47,15 @@ namespace CommonStructures
                 default:
                     return null;
             }
-            long brokerID;
+
             string symbol;
-            if (!long.TryParse(cells[0], out brokerID) || brokerID <= 0) return null;
+            if (!long.TryParse(cells[0], out var brokerID) || brokerID <= 0) return null;
             if (string.IsNullOrEmpty(symbol = cells[1])) return null;
             if (cells.Length == 2) return MakeNotTradable(brokerID, symbol);
 
-            double bid, ask;
-            DateTime time;
-            if (!double.TryParse(cells[2], out bid)) return null;
-            if (!double.TryParse(cells[3], out ask)) return null;
-            if (!cells[4].TryParseDateTime(out time)) return null;
+            if (!double.TryParse(cells[2], out var bid)) return null;
+            if (!double.TryParse(cells[3], out var ask)) return null;
+            if (!cells[4].TryParseDateTime(out var time)) return null;
             return new BidAskSnapshot(brokerID, symbol, bid, ask, time);
         }
     }

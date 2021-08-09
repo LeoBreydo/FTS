@@ -228,7 +228,7 @@ namespace Utilities
             if (Path.DirectorySeparatorChar != separ && Path.AltDirectorySeparatorChar != separ) return false;
 
             // 4) заменяем postfixFrom на postfixTo, проверяем, что такой каталог существует.
-            PathTo = PathFrom.Substring(0, posReplace) + postfixTo;
+            PathTo = PathFrom[..posReplace] + postfixTo;
             return Directory.Exists(PathTo);
         }
     }

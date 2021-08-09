@@ -18,7 +18,7 @@ namespace Utilities
         /// </summary>
         private volatile bool mbStopFlag;
         private volatile bool _isThreadStarted;
-        private readonly ManualResetEvent mThreadStoppedEvent = new ManualResetEvent(false);
+        private readonly ManualResetEvent mThreadStoppedEvent = new(false);
         private readonly bool IsBackgroundThread;
         private readonly bool SetInvariantCulture;
         /// <summary>

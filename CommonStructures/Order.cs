@@ -9,7 +9,7 @@ namespace CommonStructures
     /// OrderSide
     /// </summary>
     [JsonConverter(typeof(StringEnumConverter))]
-    public enum OrderSide
+    public enum OrderSide : int
     {
         /// <summary>
         /// OrderSide is not set 
@@ -22,7 +22,7 @@ namespace CommonStructures
         /// <summary>
         /// Sell
         /// </summary>
-        Sell = 2,
+        Sell = -1
     }
     /// <summary>
     /// OrderType
@@ -178,41 +178,25 @@ namespace CommonStructures
         // tag 39 enumeration to string
         public static string OrdStatusToString(this string ordStatus)
         {
-            switch (ordStatus)
+            return ordStatus switch
             {
-                case "D":
-                    return "AcceptBidding";
-                case "B":
-                    return "Calculated";
-                case "4":
-                    return "Canceled";
-                case "3":
-                    return "Done";
-                case "C":
-                    return "Expired";
-                case "2":
-                    return "Filled";
-                case "0":
-                    return "New";
-                case "1":
-                    return "Partial";
-                case "6":
-                    return "Pending_Cancel";
-                case "A":
-                    return "PendingNew";
-                case "E":
-                    return "PendingRep";
-                case "8":
-                    return "Rejected";
-                case "5":
-                    return "Replaced";
-                case "7":
-                    return "Stopped";
-                case "9":
-                    return "Suspended";
-                default:
-                    return "Unknown";
-            }
+                "D" => "AcceptBidding",
+                "B" => "Calculated",
+                "4" => "Canceled",
+                "3" => "Done",
+                "C" => "Expired",
+                "2" => "Filled",
+                "0" => "New",
+                "1" => "Partial",
+                "6" => "Pending_Cancel",
+                "A" => "PendingNew",
+                "E" => "PendingRep",
+                "8" => "Rejected",
+                "5" => "Replaced",
+                "7" => "Stopped",
+                "9" => "Suspended",
+                _ => "Unknown"
+            };
         }
     }
     #endregion
@@ -223,7 +207,7 @@ namespace CommonStructures
     {
         #region Main info,is required for send/cancel/replace operations
         /// <summary>
-        /// Currency pair
+        /// Contract name
         /// </summary>
         public string Symbol;
 
@@ -231,7 +215,7 @@ namespace CommonStructures
         /// trading currency 
         /// </summary>
         /// <remarks>
-        /// As usual is the base currency. Some apis allows to use quoted currency. 
+        /// As usual is the exchange currency.
         /// </remarks>
         public string Currency; 
         /// <summary>
@@ -239,7 +223,7 @@ namespace CommonStructures
         /// </summary>
         public OrderSide Side = OrderSide.Unknown;
         /// <summary>
-        /// Order Quantity
+        /// Contract Quantity
         /// </summary>
         public long OrderQty;
         /// <summary>
@@ -300,7 +284,7 @@ namespace CommonStructures
             TimeInForce timeInForce = TimeInForce.DAY, bool allOrNothing = false)
         {
             Symbol = symbol;
-            Currency = Symbol.Substring(0, 3); // base currency
+            Currency = Symbol[..3]; // base currency
             Side = side;
             OrderQty = qty;
             OrderType = orderType;
@@ -346,8 +330,6 @@ namespace CommonStructures
             }
 
             sb.Append(Side + " " + OrderQty + " " + Symbol);
-            if (!Symbol.StartsWith(Currency))
-                sb.Append("(QuotedCurrency)");
             sb.Append(" at ");
             if (OrderType != OrderType.Market)
                 sb.Append(Price + " ");

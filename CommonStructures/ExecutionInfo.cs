@@ -1,4 +1,6 @@
-﻿namespace CommonStructures
+﻿using System;
+
+namespace CommonStructures
 {
     public enum ExecutionInfoType
     {
@@ -21,7 +23,7 @@
     }
     public class ExecutionInfo
     {
-        public TimeStamp Time;
+        public DateTime Time;
         public string Symbol;
         public string Account;
         public long StrategyID;
@@ -32,7 +34,7 @@
         // if Type==Fills or IgnoredFills
         public long FilledAmount;
         public double FilledPrice;
-        public TimeStamp TransactTime;
+        public DateTime TransactTime;
 
         public UnwrappedTags Tags { get; private set; }
 

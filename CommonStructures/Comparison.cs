@@ -8,17 +8,16 @@ namespace CommonStructures
     {
         public static string ComparisonToString(this Comparison comparison)
         {
-            switch (comparison)
+            return comparison switch
             {
-                case Comparison.Eq: return "=";
-                case Comparison.NotEq: return "!=";
-                case Comparison.Less: return "<";
-                case Comparison.LessEq: return "<=";
-                case Comparison.More: return ">";
-                case Comparison.MoreEq: return ">=";
-                default:
-                    throw new Exception("Unexpected value " + comparison);
-            }
+                Comparison.Eq => "=",
+                Comparison.NotEq => "!=",
+                Comparison.Less => "<",
+                Comparison.LessEq => "<=",
+                Comparison.More => ">",
+                Comparison.MoreEq => ">=",
+                _ => throw new Exception("Unexpected value " + comparison)
+            };
         }
     }
 

@@ -59,11 +59,11 @@ namespace Messages
         }
         public static BrokerConnectionStatus MakeDisconnected(long brokerID, bool isQuoteSession, SessionConnectionStatus connectionStatus, string details = null)
         {
-            return new BrokerConnectionStatus(brokerID, isQuoteSession, connectionStatus, details);
+            return new(brokerID, isQuoteSession, connectionStatus, details);
         }
         public static BrokerConnectionStatus MakeConnected(long brokerID, bool isQuoteSession, string details = null)
         {
-            return new BrokerConnectionStatus(brokerID, isQuoteSession, SessionConnectionStatus.ConnectionEstablished, details);
+            return new(brokerID, isQuoteSession, SessionConnectionStatus.ConnectionEstablished, details);
         }
 
     }

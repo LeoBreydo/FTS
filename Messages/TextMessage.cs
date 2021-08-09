@@ -46,21 +46,21 @@ namespace Messages
         }
     }
 
-    public class ClientMsg:BaseMessage
-    {
-        public ClientMessage ClientMessage;
-        public string Account;
-        public string CurrencyPair;
-
-        public ClientMsg() : base(MessageNumbers.ClientMsg) { }
-        public ClientMsg(ClientMessage clientMessage, string account, string currencyPair)
-            : base(MessageNumbers.ClientMsg)
-        {
-            ClientMessage = clientMessage;
-            Account = account;
-            CurrencyPair = currencyPair;
-        }
-    }
+    // public class ClientMsg:BaseMessage
+    // {
+    //     public ClientMessage ClientMessage;
+    //     public string Account;
+    //     public string CurrencyPair;
+    //
+    //     public ClientMsg() : base(MessageNumbers.ClientMsg) { }
+    //     public ClientMsg(ClientMessage clientMessage, string account, string currencyPair)
+    //         : base(MessageNumbers.ClientMsg)
+    //     {
+    //         ClientMessage = clientMessage;
+    //         Account = account;
+    //         CurrencyPair = currencyPair;
+    //     }
+    // }
 
     public class CantRestoreMessage : BaseMessage
     {

@@ -26,7 +26,7 @@ namespace Utilities
         /// <summary>
         /// list to manage add/remove
         /// </summary>
-        private readonly List<T> mList = new List<T>();
+        private readonly List<T> mList = new();
         /// <summary>
         /// array to enumerate added items
         /// </summary>

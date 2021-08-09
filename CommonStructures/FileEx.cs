@@ -8,15 +8,13 @@ namespace CommonStructures
     {
         public static IEnumerable<string> ReadLinesReadonly(string fileName)
         {
-            using (var fs = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-            using (var sr = new StreamReader(fs))
+            using var fs = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var sr = new StreamReader(fs);
+            while (true)
             {
-                while (true)
-                {
-                    string row=sr.ReadLine();
-                    if (row == null) break;
-                    yield return row;
-                } 
+                string row=sr.ReadLine();
+                if (row == null) break;
+                yield return row;
             }
         }
         public static IEnumerable<string> ReadAllLinesReadonly(string fileName)

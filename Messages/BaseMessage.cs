@@ -1,3 +1,4 @@
+using System;
 using CommonStructures;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
@@ -14,7 +15,7 @@ namespace Messages
     public abstract class BaseMessage : IMsg
     {
         [JsonProperty(Order = -4)]
-        public TimeStamp Time { get; set; }
+        public DateTime Time { get; set; }
 
         [JsonProperty(Order = -3)]
         public int MessageNumber { get { return (int)MessageType; } }
@@ -26,11 +27,11 @@ namespace Messages
 
         protected BaseMessage()
         {
-            Time = TimeStamp.UtcNow;
+            Time = DateTime.UtcNow;
         }
         protected BaseMessage(MessageNumbers messageNumber)
         {
-            Time = TimeStamp.UtcNow;
+            Time = DateTime.UtcNow;
             MessageType = messageNumber;
         }
 

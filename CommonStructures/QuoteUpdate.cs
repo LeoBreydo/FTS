@@ -1,5 +1,4 @@
-﻿//#if TRANSMIT_FULLQUOTEBOOK 
-using System;
+﻿using System;
 
 namespace CommonStructures
 {
@@ -33,53 +32,7 @@ namespace CommonStructures
         /// </summary>
         QuoteCancelFlag = 8,
     }
-    /// <summary>
-    /// Member of the QuoteInfo. Contains the values and sizes of bid and ask.
-    /// </summary>
-    [Serializable]
-    public struct BidAskInfo
-    {
-        /// <summary>
-        /// ask quote 
-        /// </summary>
-        public double Ask { get; private set; }
-        /// <summary>
-        /// bid quote 
-        /// </summary>
-        public double Bid { get; private set; }
-        /// <summary>
-        /// bid size
-        /// </summary>
-        public long BidSize { get; private set; }
-        /// <summary>
-        /// ask size
-        /// </summary>
-        public long AskSize { get; private set; }
-        /// <summary>
-        /// explicit ctor
-        /// </summary>
-        public BidAskInfo(double bid, long bidSize, double ask, long askSize)
-            : this()
-        {
-            Bid = bid;
-            BidSize = bidSize;
-            Ask = ask;
-            AskSize = askSize;
-        }
-        /// <summary>
-        /// copy ctor
-        /// </summary>
-        public BidAskInfo(BidAskInfo from)
-            : this()
-        {
-            Bid = from.Bid;
-            BidSize = from.BidSize;
-            Ask = from.Ask;
-            AskSize = from.AskSize;
-        }
-
-    }
-
+   
     /// <summary>
     /// Quote update message from broker, quotes stream item
     /// </summary>
@@ -97,135 +50,11 @@ namespace CommonStructures
     /// </remarks>
     public class QuoteUpdate
     {
-#if TRANSMIT_FULLQUOTEBOOK // not used now (was used previously to transmit the whole orderbook from provider to research and display in the ConformanceTest gui)
         /// <summary>
         /// Identifier of the broker
         /// </summary>
         public readonly long BrokerID;
-
         public string Symbol;
-        public long Volume;
-
-        public double BestBid { get { return QuoteInfo.BestBid; } }
-        public double BestAsk { get { return QuoteInfo.BestAsk; } }
-        public long BestBidSize { get { return QuoteInfo.BestBidSize; } }
-        public long BestAskSize { get { return QuoteInfo.BestAskSize; } }
-
-        public QuoteTypes QuoteType { get { return QuoteInfo.QuoteType; } }
-        public bool IsQuoteCancelFlag { get { return QuoteInfo.IsQuoteCancelFlag; } }
-        public bool IsTradable { get { return QuoteInfo.IsTradable; } }
-        public TimeStamp TransactTime { get { return QuoteInfo.TransactTime; } }
-        public string QuoteID { get { return QuoteInfo.QuoteID; } }
-                
-        // введено для совместимости с кодом ConformanceTest
-        public BidAskInfo[] BidAskInfos { get { return QuoteInfo.BidAskInfos; } }
-
-        /// <summary>
-        /// True value used when QuoteCancel is sent for the all broker instruments
-        /// </summary>
-        public readonly bool ForAllSymbols;
-        /// <summary>
-        /// The transmitted market data
-        /// </summary>
-        public QuoteInfo QuoteInfo;
-
-        /// <summary>
-        /// Ctor
-        /// </summary>
-        public QuoteUpdate(long brokerId, string symbol, long volume, 
-            QuoteTypes quoteType, TimeStamp transactTime, double bestBid, long bestBidSize, double bestAsk, long bestAskSize, string quoteID)
-        {
-            BrokerID = brokerId;
-            Symbol = symbol;
-            Volume = volume;
-            ForAllSymbols = false;
-            QuoteInfo = new QuoteInfo(quoteType, transactTime, bestBid, bestBidSize, bestAsk, bestAskSize, quoteID);
-        }
-        /// <summary>
-        /// Ctor to transmit the full bool
-        /// </summary>
-        public QuoteUpdate(long brokerId, string symbol, long volume,
-            QuoteTypes quoteType, string quoteID, TimeStamp transactTime, BidAskInfo[] bidAskInfos)
-        {
-            BrokerID = brokerId;
-            Symbol = symbol;
-            Volume = volume;
-            ForAllSymbols = false;
-            QuoteInfo = new QuoteInfo(quoteType, quoteID, transactTime, bidAskInfos);
-        }
-
-        public QuoteUpdate(long brokerId, string symbol, long volume, QuoteInfo quoteInfo)
-        {
-            BrokerID = brokerId;
-            Symbol = symbol;
-            Volume = volume;
-            ForAllSymbols = false;
-            QuoteInfo = quoteInfo;
-        }
-        /// <summary>
-        /// ctor for unit tests
-        /// </summary>
-        public QuoteUpdate(long brokerId, string symbol, double bid, double ask, TimeStamp time, bool isIndicative = false)
-        {
-            BrokerID = brokerId;
-            Symbol = symbol;
-            Volume = 0;
-            ForAllSymbols = false;
-
-            QuoteInfo = new QuoteInfo(isIndicative ? QuoteTypes.Indicative : QuoteTypes.Tradable, time, bid, 1, ask, 1, "");
-        }
-
-
-        /// <summary>
-        /// Ctor for QuoteCancelFlag for the all broker instruments
-        /// </summary>
-        /// <param name="brokerId">broker ID</param>
-        /// <param name="timeStamp">time of the quote update</param>
-        private QuoteUpdate(long brokerId, TimeStamp timeStamp)
-        {
-            BrokerID = brokerId;
-            ForAllSymbols = true;
-            QuoteInfo = QuoteInfo.MakeQuoteCancelFlag(timeStamp);
-        }
-
-        /// <summary>
-        /// Ctor for QuoteCancelFlag for the specified broker instrument
-        /// </summary>
-        private QuoteUpdate(long brokerId, string symbol, long volume, TimeStamp timeStamp)
-        {
-            BrokerID = brokerId;
-            Symbol = symbol;
-            Volume = volume;
-            ForAllSymbols = false;
-            QuoteInfo = QuoteInfo.MakeQuoteCancelFlag(timeStamp);
-        }
-
-        /// <summary>
-        /// Creates the new QuoteCancelFlag for the all broker instruments
-        /// </summary>
-        /// <param name="brokerID">brokerID</param>
-        /// <param name="timeStamp">message time (can be unspecified for cases like connection lost)</param>
-        /// <returns></returns>
-        public static QuoteUpdate MakeQuoteCancelFlagForAllSymbols(long brokerID, TimeStamp timeStamp)
-        {
-            return new QuoteUpdate(brokerID, timeStamp);
-        }
-
-        /// <summary>
-        /// Creates the new QuoteCancelFlag for the specified broker instrument
-        /// </summary>
-        public static QuoteUpdate MakeQuoteCancelFlagForSymbol(long brokerID, string symbol, long volume, TimeStamp timeStamp)
-        {
-            return new QuoteUpdate(brokerID, symbol, volume, timeStamp);
-        }
-#else
-        /// <summary>
-        /// Identifier of the broker
-        /// </summary>
-        public readonly long BrokerID;
-
-        public string Symbol; 
-        public long Volume; // used by Citi only as part of the instrument specification
 
         /// <summary>
         /// the type of quote
@@ -241,7 +70,7 @@ namespace CommonStructures
         /// <summary>
         /// time of the data
         /// </summary>
-        public readonly TimeStamp TransactTime;// { get; private set; }
+        public readonly DateTime TransactTime;// { get; private set; }
 
         public DateTime MessageCreatedTime { get; set; } // todo torename to ReceivedTime
 
@@ -258,16 +87,12 @@ namespace CommonStructures
         {
             get
             {
-                switch (QuoteType)
+                return QuoteType switch
                 {
-                    case QuoteTypes.Tradable:
-                    case QuoteTypes.RestrictedTradable:
-                        return (BestBidSize > 0 && BestAskSize > 0);
-
-                    default:
-                        // QuoteCancelFlag, any S5BarCorrection or Indicative quote
-                        return false;
-                }
+                    QuoteTypes.Tradable => (BestBidSize > 0 && BestAskSize > 0),
+                    QuoteTypes.RestrictedTradable => (BestBidSize > 0 && BestAskSize > 0),
+                    _ => false
+                };
             }
         }
         public bool IsQuoteCancelFlag { get { return QuoteType == QuoteTypes.QuoteCancelFlag; } }
@@ -280,12 +105,11 @@ namespace CommonStructures
         /// <summary>
         /// Ctor
         /// </summary>
-        public QuoteUpdate(long brokerId, string symbol, long volume, 
-            QuoteTypes quoteType, TimeStamp transactTime, double bestBid, long bestBidSize, double bestAsk, long bestAskSize, string quoteID)
+        public QuoteUpdate(long brokerId, string symbol,
+            QuoteTypes quoteType, DateTime transactTime, double bestBid, long bestBidSize, double bestAsk, long bestAskSize, string quoteID)
         {
             BrokerID = brokerId;
             Symbol = symbol;
-            Volume = volume;
             ForAllSymbols = false;
 
             QuoteType = quoteType;
@@ -297,11 +121,10 @@ namespace CommonStructures
             BestAskSize = bestAskSize;
         }
 
-        public QuoteUpdate(long brokerId, string symbol, double bid, double ask, TimeStamp transactTime, bool isIndicative = false)
+        public QuoteUpdate(long brokerId, string symbol, double bid, double ask, DateTime transactTime, bool isIndicative = false)
         {
             BrokerID = brokerId;
             Symbol = symbol;
-            Volume = 0;
             ForAllSymbols = false;
 
             QuoteType = isIndicative ? QuoteTypes.Indicative : QuoteTypes.Tradable;
@@ -315,29 +138,15 @@ namespace CommonStructures
 
         public static QuoteUpdate Create5sBarUpdate(long brokerId, string symbol, QuoteTypes qt,double high,double low, DateTime barOpenTime)
         {
-            switch (qt)
+            return qt switch
             {
-                case QuoteTypes.S5BidCorrection:
-                case QuoteTypes.S5AskCorrection:
-                case QuoteTypes.S5MidCorrection:
-                    return new QuoteUpdate(brokerId, symbol, qt, high, low, new TimeStamp(barOpenTime));
-                default:
-                    throw new Exception("Unexpected QuoteType " + qt);
-            }
+                QuoteTypes.S5BidCorrection => new QuoteUpdate(brokerId, symbol, qt, high, low, barOpenTime),
+                QuoteTypes.S5AskCorrection => new QuoteUpdate(brokerId, symbol, qt, high, low, barOpenTime),
+                QuoteTypes.S5MidCorrection => new QuoteUpdate(brokerId, symbol, qt, high, low, barOpenTime),
+                _ => throw new Exception("Unexpected QuoteType " + qt)
+            };
         }
-        public static QuoteUpdate Create5sBarUpdate(long brokerId, string symbol, QuoteTypes qt, double high, double low, TimeStamp barOpenTime)
-        {
-            switch (qt)
-            {
-                case QuoteTypes.S5BidCorrection:
-                case QuoteTypes.S5AskCorrection:
-                case QuoteTypes.S5MidCorrection:
-                    return new QuoteUpdate(brokerId, symbol, qt, high, low, barOpenTime);
-                default:
-                    throw new Exception("Unexpected QuoteType " + qt);
-            }
-        }
-        private QuoteUpdate(long brokerId, string symbol, QuoteTypes qt, double high, double low, TimeStamp barOpenTime)
+        private QuoteUpdate(long brokerId, string symbol, QuoteTypes qt, double high, double low, DateTime barOpenTime)
         {
             BrokerID = brokerId;
             Symbol = symbol;
@@ -358,35 +167,24 @@ namespace CommonStructures
         /// </summary>
         /// <param name="brokerId">broker ID</param>
         /// <param name="transactTime">time of the quote update</param>
-        private QuoteUpdate(long brokerId, TimeStamp transactTime)
+        private QuoteUpdate(long brokerId, DateTime transactTime)
         {
             BrokerID = brokerId;
             ForAllSymbols = true;
             QuoteType = QuoteTypes.QuoteCancelFlag;
             TransactTime = transactTime;
-            //QuoteID = "";
-            //BestBid = 0;
-            //BestBidSize = 0;
-            //BestAsk = 0;
-            //BestAskSize = 0;
         }
 
         /// <summary>
         /// Ctor for QuoteCancelFlag for the specified broker instrument
         /// </summary>
-        private QuoteUpdate(long brokerId, string symbol, long volume, TimeStamp transactTime)
+        private QuoteUpdate(long brokerId, string symbol, DateTime transactTime)
         {
             BrokerID = brokerId;
             Symbol = symbol;
-            Volume = volume;
             ForAllSymbols = false;
             QuoteType = QuoteTypes.QuoteCancelFlag;
             TransactTime = transactTime;
-            //QuoteID = "";
-            //BestBid = 0;
-            //BestBidSize = 0;
-            //BestAsk = 0;
-            //BestAskSize = 0;
         }
 
         /// <summary>
@@ -395,19 +193,17 @@ namespace CommonStructures
         /// <param name="brokerID">brokerID</param>
         /// <param name="transactTime">message time (can be unspecified for cases like connection lost)</param>
         /// <returns></returns>
-        public static QuoteUpdate MakeQuoteCancelFlagForAllSymbols(long brokerID, TimeStamp transactTime)
+        public static QuoteUpdate MakeQuoteCancelFlagForAllSymbols(long brokerID, DateTime transactTime)
         {
-            return new QuoteUpdate(brokerID, transactTime);
+            return new(brokerID, transactTime);
         }
 
         /// <summary>
         /// Creates the new QuoteCancelFlag for the specified broker instrument
         /// </summary>
-        public static QuoteUpdate MakeQuoteCancelFlagForSymbol(long brokerID, string symbol, long volume, TimeStamp transactTime)
+        public static QuoteUpdate MakeQuoteCancelFlagForSymbol(long brokerID, string symbol, DateTime transactTime)
         {
-            return new QuoteUpdate(brokerID, symbol, volume, transactTime);
+            return new(brokerID, symbol, transactTime);
         }
-#endif
-
     }
 }

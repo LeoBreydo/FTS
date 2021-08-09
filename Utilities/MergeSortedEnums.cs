@@ -42,7 +42,7 @@ namespace Utilities
         {
             var enumerators = new IEnumerator<T>[sortedEnumerations.Length];
             int count = 0;
-            T minValue = default(T);
+            T minValue = default;
             bool first = true;
             foreach (IEnumerable<T> enm in sortedEnumerations)
             {
@@ -61,7 +61,7 @@ namespace Utilities
             while (count > 1)
             {
                 T prevMinValue = minValue;
-                minValue = default(T);
+                minValue = default;
                 first = true;
                 int fnishedEnumerators = 0;
                 for (int i = 0; i < count; ++i)

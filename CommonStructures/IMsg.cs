@@ -1,6 +1,7 @@
-﻿namespace CommonStructures
-{
+﻿using System;
 
+namespace CommonStructures
+{
     /// <summary>
     /// The messages sending by channels
     /// </summary>
@@ -9,7 +10,7 @@
     /// </remarks>
     public interface IMsg 
     {
-        TimeStamp Time { get; set; }
+        DateTime Time { get; set; }
         int MessageNumber { get; }
         string Serialize();
     }

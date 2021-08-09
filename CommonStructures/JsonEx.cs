@@ -28,7 +28,7 @@ namespace CommonStructures
             }
             catch
             {
-                result = default(T);
+                result = default;
                 return false;
             }
         }

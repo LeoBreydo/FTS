@@ -19,7 +19,7 @@ namespace Utilities
     }
     public class ActivitySchedule
     {
-        public List<WorkingInterval> WorkingIntervals = new List<WorkingInterval>();
+        public List<WorkingInterval> WorkingIntervals = new();
 
         private DateTime nextUpdateTime = DateTime.MinValue;
         private bool _hasWorkingState;

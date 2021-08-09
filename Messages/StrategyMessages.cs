@@ -1,6 +1,6 @@
 ﻿using System;
 using CommonStructures;
-using CfgDescription;
+//using CfgDescription;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 namespace Messages
@@ -460,12 +460,12 @@ namespace Messages
     {
         public long StrategyID;
         public string TransactionID;
-        public TimeStamp OrderStartTime;
+        public DateTime OrderStartTime;
         public FillsItem Fill;
         public long RestOrderedAmount;
 
         public FillAcceptedByExecutor() : base(MessageNumbers.FillAcceptedByExecutor) { }
-        public FillAcceptedByExecutor(long strategyID, string transactionID, TimeStamp orderStartTime, FillsItem fill, long restOrderedAmount)//long brokerID, string clOrderID, string orderId, string execId, long qty, double price, string currencyPair, 
+        public FillAcceptedByExecutor(long strategyID, string transactionID, DateTime orderStartTime, FillsItem fill, long restOrderedAmount)//long brokerID, string clOrderID, string orderId, string execId, long qty, double price, string currencyPair, 
             : base(MessageNumbers.FillAcceptedByExecutor)
         {
             StrategyID = strategyID;
@@ -486,12 +486,12 @@ namespace Messages
         public long BrokerID;
         public string Symbol;
         public string ClOrdID;
-        public TimeStamp OrderStartTime;
+        public DateTime OrderStartTime;
         public string FinishedState;
         public long NonFilledOrderedAmount;
 
         public StrategySentOrderWasNotFilled() : base(MessageNumbers.StrategySentOrderWasNotFilled) { }
-        public StrategySentOrderWasNotFilled(long strategyID, string transactionID, long brokerID, string symbol, string clOrderID, TimeStamp orderStartTime, string finishedState, long nonFilledOrderedAmount)
+        public StrategySentOrderWasNotFilled(long strategyID, string transactionID, long brokerID, string symbol, string clOrderID, DateTime orderStartTime, string finishedState, long nonFilledOrderedAmount)
             : base(MessageNumbers.StrategySentOrderWasNotFilled)
         {
             StrategyID = strategyID;
@@ -529,12 +529,12 @@ namespace Messages
 
         public long BrokerID;
         public string ClOrdID;
-        public TimeStamp OrderStartTime;
+        public DateTime OrderStartTime;
         public long SecondsSinceOrderSentToBroker;
         public long NonFilledOrderedAmount;
 
         public StrategyOrderExecutionSuspendedViaResponseTimeout() : base(MessageNumbers.StrategyOrderExecutionSuspendedViaResponseTimeout) { }
-        public StrategyOrderExecutionSuspendedViaResponseTimeout(long strategyID, string transactionID, long brokerID, string clOrderID, TimeStamp orderStartTime, long secondsSinceOrderSentToBroker, long nonFilledOrderedAmount)
+        public StrategyOrderExecutionSuspendedViaResponseTimeout(long strategyID, string transactionID, long brokerID, string clOrderID, DateTime orderStartTime, long secondsSinceOrderSentToBroker, long nonFilledOrderedAmount)
             : base(MessageNumbers.StrategyOrderExecutionSuspendedViaResponseTimeout)
         {
             StrategyID = strategyID;
@@ -721,22 +721,22 @@ namespace Messages
         }
     }
 
-    public class StrategyCfgInfoMsg:BaseMessage
-    {
-        //private long ID;
-        //public readonly StrategyDescription StrategyDescription;
-        public StrategyDescription Description;
-        public StrategyCfgInfoMsg() : base(MessageNumbers.StrategyCfgInfoMsg) { }
-        //public StrategyCfgInfoMsg(StrategyDescription strategyDescription)
-        public StrategyCfgInfoMsg(StrategyDescription sd)
-            : base(MessageNumbers.StrategyCfgInfoMsg)
-        {
-            Description = sd;
-            //StrategyDescription = strategyDescription;
-            //ID = strategyDescription.StrategyID;
-            //txt = strategyDescription.ToJson();
-        }
-    }
+    // public class StrategyCfgInfoMsg:BaseMessage
+    // {
+    //     //private long ID;
+    //     //public readonly StrategyDescription StrategyDescription;
+    //     public StrategyDescription Description;
+    //     public StrategyCfgInfoMsg() : base(MessageNumbers.StrategyCfgInfoMsg) { }
+    //     //public StrategyCfgInfoMsg(StrategyDescription strategyDescription)
+    //     public StrategyCfgInfoMsg(StrategyDescription sd)
+    //         : base(MessageNumbers.StrategyCfgInfoMsg)
+    //     {
+    //         Description = sd;
+    //         //StrategyDescription = strategyDescription;
+    //         //ID = strategyDescription.StrategyID;
+    //         //txt = strategyDescription.ToJson();
+    //     }
+    // }
 
 
     public class ApplyFillsToStrategy : BaseMessage
@@ -811,20 +811,20 @@ namespace Messages
     }
 
 
-    public class VirtualStrategyCfgInfoMsg : BaseMessage
-    {
-        public StrategyDescription Description;
-
-        public VirtualStrategyCfgInfoMsg() : base(MessageNumbers.VirtualStrategyCfgInfoMsg) { }
-        public VirtualStrategyCfgInfoMsg(StrategyDescription sd)
-            : base(MessageNumbers.VirtualStrategyCfgInfoMsg)
-        {
-            Description = sd;
-            //StrategyDescription = strategyDescription;
-            //ID = strategyDescription.StrategyID;
-            //txt = strategyDescription.ToJson();
-        }
-    }
+    // public class VirtualStrategyCfgInfoMsg : BaseMessage
+    // {
+    //     public StrategyDescription Description;
+    //
+    //     public VirtualStrategyCfgInfoMsg() : base(MessageNumbers.VirtualStrategyCfgInfoMsg) { }
+    //     public VirtualStrategyCfgInfoMsg(StrategyDescription sd)
+    //         : base(MessageNumbers.VirtualStrategyCfgInfoMsg)
+    //     {
+    //         Description = sd;
+    //         //StrategyDescription = strategyDescription;
+    //         //ID = strategyDescription.StrategyID;
+    //         //txt = strategyDescription.ToJson();
+    //     }
+    // }
     public class VirtualStrategyInfoMsg : BaseMessage
     {
         public long StrategyID;
@@ -890,10 +890,10 @@ namespace Messages
         public double Bid;
         public double Ask;
         public double Price { get { return FilledAmount > 0 ? Ask : Bid; } }
-        public TimeStamp TransactTime;
+        public DateTime TransactTime;
         public VirtualStrategyOrderExecution() : base(MessageNumbers.VirtualStrategyOrderExecution) { }
         public VirtualStrategyOrderExecution(long strategyID, string symbol, string transactionID,
-                                             long brokerID, long filledAmount, double filledPrice,TimeStamp transactTime,
+                                             long brokerID, long filledAmount, double filledPrice,DateTime transactTime,
                                              long positionBeforeFills, long positionAfterFills,
                                              double bid, double ask)
             : base(MessageNumbers.VirtualStrategyOrderExecution)

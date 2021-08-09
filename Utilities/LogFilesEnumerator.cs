@@ -45,8 +45,7 @@ namespace Utilities
                 foreach (string fileName in Directory.GetFiles(folder, fileMask))
                 {
                     string yyyyMMdd = Path.GetFileNameWithoutExtension(fileName);
-                    DateTime dt;
-                    if (!DateTime.TryParseExact(yyyyMMdd, _dateFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dt))
+                    if (!DateTime.TryParseExact(yyyyMMdd, _dateFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt))
                         continue;
 
                     if (string.CompareOrdinal(yyyyMMdd, firstDate) < 0 || string.CompareOrdinal(yyyyMMdd, endDate) >= 0)
@@ -59,8 +58,7 @@ namespace Utilities
                 foreach (string subDir in Directory.GetDirectories(folder))
                 {
                     string yyyyMMdd = Path.GetFileName(subDir);
-                    DateTime dt;
-                    if (!DateTime.TryParseExact(yyyyMMdd, _dateFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dt))
+                    if (!DateTime.TryParseExact(yyyyMMdd, _dateFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt))
                         continue;
 
                     if (string.CompareOrdinal(yyyyMMdd, firstDate) < 0 || string.CompareOrdinal(yyyyMMdd, endDate) >= 0)
@@ -94,8 +92,7 @@ namespace Utilities
                 foreach (string fileName in Directory.GetFiles(folder, fileMask))
                 {
                     string yyyyMMdd = Path.GetFileNameWithoutExtension(fileName);
-                    DateTime dt;
-                    if (!DateTime.TryParseExact(yyyyMMdd, _dateFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dt))
+                    if (!DateTime.TryParseExact(yyyyMMdd, _dateFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt))
                         continue;
                     if (firstDate > dt)
                         firstDate = dt;
@@ -108,8 +105,7 @@ namespace Utilities
                 foreach (string subDir in Directory.GetDirectories(folder))
                 {
                     string yyyyMMdd = Path.GetFileName(subDir);
-                    DateTime dt;
-                    if (!DateTime.TryParseExact(yyyyMMdd, _dateFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dt))
+                    if (!DateTime.TryParseExact(yyyyMMdd, _dateFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt))
                         continue;
                     string fileName = Path.Combine(subDir, yyyyMMdd + extension);
                     if (!File.Exists(fileName)) continue;
@@ -131,17 +127,15 @@ namespace Utilities
         /// <param name="fileContainsHeader">имеется ли у лог-файла заголовок, который нужно пропустить при перечислении</param>
         public static IEnumerable<string> ReadAllLines(this string fileName, bool fileContainsHeader)
         {
-            using (var fs = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            using var fs = File.Open(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            var sr = new StreamReader(fs);
+            if (fileContainsHeader)
+                sr.ReadLine();
+            while (true)
             {
-                var sr = new StreamReader(fs);
-                if (fileContainsHeader)
-                    sr.ReadLine();
-                while (true)
-                {
-                    string row = sr.ReadLine();
-                    if (row == null) break;
-                    yield return row;
-                }
+                string row = sr.ReadLine();
+                if (row == null) break;
+                yield return row;
             }
         }
 

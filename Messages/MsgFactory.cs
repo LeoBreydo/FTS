@@ -13,7 +13,7 @@ namespace Messages
     }
     public class MsgFactory:IMsgFactory
     {
-        private readonly Dictionary<int, Type> messageTypes = new Dictionary<int, Type>();
+        private readonly Dictionary<int, Type> messageTypes = new();
         public MsgFactory()
         {
             foreach (Type t in FindPublicTypesOfInterface(Assembly.GetAssembly(typeof(BaseMessage)), typeof(IMsg)))

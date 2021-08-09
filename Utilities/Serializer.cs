@@ -14,7 +14,7 @@ namespace Utilities
     /// <typeparam name="T"></typeparam>
     public static class Serializer<T>
     {
-        private static readonly XmlSerializer serializer = new XmlSerializer(typeof(T));
+        private static readonly XmlSerializer serializer = new(typeof(T));
 
         /// <summary>
         /// serialize data to xml file
@@ -31,10 +31,8 @@ namespace Utilities
                 string dirName = Path.GetDirectoryName(Path.GetFullPath(FileName));
                 if (dirName != null && !Directory.Exists(dirName)) Directory.CreateDirectory(dirName);
 
-                using (TextWriter writer = new StreamWriter(FileName))
-                {
-                    serializer.Serialize(writer, item);
-                }
+                using TextWriter writer = new StreamWriter(FileName);
+                serializer.Serialize(writer, item);
             }
             catch
             {
@@ -59,32 +57,28 @@ namespace Utilities
                 {
                     if (Rethrow)
                         throw new Exception(string.Format("File not found '{0}'", FileName));
-                    return default(T);
+                    return default;
                 }
-                    
-                using (var fs = new FileStream(FileName, FileMode.Open,FileAccess.Read,FileShare.ReadWrite))
-                {
-                    res = (T)serializer.Deserialize(fs);
-                }
+
+                using var fs = new FileStream(FileName, FileMode.Open,FileAccess.Read,FileShare.ReadWrite);
+                res = (T)serializer.Deserialize(fs);
             }
             catch(Exception excp)
             {
-                if (Rethrow) throw; res = default(T);
+                if (Rethrow) throw; res = default;
             }
             return res;
         }
         public static string Open(string FileName, out T res)
         {
-            res = default(T);
+            res = default;
             try
             {
                 if (!File.Exists(FileName))
                     return string.Format("File not found '{0}'", FileName);
 
-                using (var fs = new FileStream(FileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                {
-                    res = (T)serializer.Deserialize(fs);
-                }
+                using var fs = new FileStream(FileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                res = (T)serializer.Deserialize(fs);
 
                 return null;
             }
@@ -105,7 +99,7 @@ namespace Utilities
         /// <summary>
         /// serializer instance
         /// </summary>
-        readonly XmlSerializer serializer = new XmlSerializer(typeof(T));
+        readonly XmlSerializer serializer = new(typeof(T));
         /// <summary>
         /// true=improved reliability when overwrite the data
         /// </summary>
@@ -182,19 +176,19 @@ namespace Utilities
         {
             T res;
             if (!mbCarefull)
-                return (OpenImpl(FileName, out res, throwIfProblems)) ? res : default(T);
+                return (OpenImpl(FileName, out res, throwIfProblems)) ? res : default;
 
             bool bFileExists = File.Exists(FileName);
             string bakFileName = FileName + ".bak";
             bool bBackFileExists = File.Exists(bakFileName);
 
             // no data found on the disk
-            if (!bFileExists && !bBackFileExists) return default(T);
+            if (!bFileExists && !bBackFileExists) return default;
 
             if (!bBackFileExists)
             {
                 // the backuped file not exists (the last save was succeeded)
-                return (OpenImpl(FileName, out res, throwIfProblems)) ? res : default(T);
+                return (OpenImpl(FileName, out res, throwIfProblems)) ? res : default;
             }
 
             // Note! we not delete the bakup file before explicit Save call
@@ -203,7 +197,7 @@ namespace Utilities
             if (OpenImpl(FileName, out res, false))
                 return res; // if ok, then suppose the error occured when tried to copy main file to the backup or delete the backup file
             // if main file is invalid restore data from backup file
-            return (OpenImpl(bakFileName, out res, throwIfProblems)) ? res : default(T);
+            return (OpenImpl(bakFileName, out res, throwIfProblems)) ? res : default;
         }
 
         private bool OpenImpl(string FileName, out T res, bool Rethrow)
@@ -212,11 +206,12 @@ namespace Utilities
             {
                 if (!File.Exists(FileName))
                 {
-                    res = default(T);
+                    res = default;
                     return false;
                 }
-                using (var fs = new FileStream(FileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                    res = (T)serializer.Deserialize(fs);
+
+                using var fs = new FileStream(FileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                res = (T)serializer.Deserialize(fs);
 
                 return true;
             }
@@ -224,7 +219,7 @@ namespace Utilities
             {
                 if (Rethrow) throw;
 
-                res = default(T);
+                res = default;
                 return false;
             }
         }
@@ -269,7 +264,7 @@ namespace Utilities
             }
             catch (Exception)
             {
-                return default(T);
+                return default;
             }
         }
     }

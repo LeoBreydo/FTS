@@ -14,11 +14,11 @@ namespace Messages
         private static readonly JsonSerializer _serializer = JsonSerializer.Create(new JsonSerializerSettings());
 
         private static readonly string ptnTime = "^\\{'Time':'(?<time>.{0,}?)',".Replace('\'', '\"');
-        public static TimeStamp GetMessageTime(this string serializedMsg)
+        public static DateTime GetMessageTime(this string serializedMsg)
         {
             try
             {
-                return TimeStamp.Parse(Regex.Match(serializedMsg, ptnTime).Groups["time"].Value);
+                return DateTime.Parse(Regex.Match(serializedMsg, ptnTime).Groups["time"].Value);
             }
             catch (Exception exception)
             {

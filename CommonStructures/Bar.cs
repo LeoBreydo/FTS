@@ -92,8 +92,7 @@ namespace CommonStructures
 
         private static Bar[] GetBarsFromTableRow(this string[] cells)
         {
-            DateTime dt;
-            if (!DateTime.TryParseExact(cells[0], barTimeFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dt))
+            if (!DateTime.TryParseExact(cells[0], barTimeFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt))
                 return null;
 
             var ohlc = new double[12];
@@ -156,9 +155,7 @@ namespace CommonStructures
 
         public static Tuple<long, string, Bar> GetBarFromTextTableRow(this string row)
         {
-            long providerID;
-            string symbol;
-            string[] cells = GetProviderCurrencyPairFromTableRow(row, out providerID, out symbol);
+            string[] cells = GetProviderCurrencyPairFromTableRow(row, out var providerID, out var symbol);
             if (cells == null) return null; //  invalid row
             Bar bar = cells.GetBarFromTableRow();
             if (bar==null) return null;
@@ -182,8 +179,7 @@ namespace CommonStructures
         }
         private static Bar GetBarFromTableRow(this string[] cells)
         {
-            DateTime dt;
-            if (!DateTime.TryParseExact(cells[0], barTimeFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out dt))
+            if (!DateTime.TryParseExact(cells[0], barTimeFormat, null, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var dt))
                 return null;
             var ohlc = new double[4];
             for(int i=0;i<4;++i)

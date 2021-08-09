@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net5.0</TargetFramework>
+    <LangVersion>default</LangVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TimeZoneConverter" Version="3.5.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Messages\Messages.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="CSharpAPI">
+      <HintPath>..\BrokerFacadeIB\bin\Debug\net5.0\ref\CSharpAPI.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
+</Project>

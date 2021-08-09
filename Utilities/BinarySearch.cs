@@ -99,8 +99,7 @@ namespace Utilities
         /// <returns>-1 или индекс найденного элемента</returns>
         public static int FindNearestItem<TStorage, T>(TStorage storage, BinarySearchTarget target, T Value, int NumItemsInStorage, Func<T, TStorage, int, int> fCompareValToStorageItem)
         {
-            int iBefore, iAfter;
-            Find(Value, storage, NumItemsInStorage, fCompareValToStorageItem, out iBefore, out iAfter);
+            Find(Value, storage, NumItemsInStorage, fCompareValToStorageItem, out var iBefore, out var iAfter);
             switch (target)
             {
                 case BinarySearchTarget.Less:

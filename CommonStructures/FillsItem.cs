@@ -11,8 +11,8 @@ namespace CommonStructures
     {
         #region the FillsItem key
         // these 3 field gives an unique identification of the FillsItem
-        public string ClOrdId;
-        public string OrderId;
+        public int ClOrdId;
+        public int OrderId;
         public long CumQty;
         #endregion
 
@@ -20,27 +20,25 @@ namespace CommonStructures
         public string ExecID;
 
         public string Symbol;
+        public string ContractCode;
+        public string Exchange;
         [JsonConverter(typeof(StringEnumConverter))]
         public OrderSide OrderSide;
         public long Qty;
         public double Price;
-        public TimeStamp TransactTime { get; set; }
-        public TimeStamp FillsReceivedTime;
+        public DateTime TransactTime { get; set; }
+        public DateTime FillsReceivedTime;
 
         public long SgnQty
         {
             get
             {
-                switch (OrderSide)
+                return OrderSide switch
                 {
-                    case OrderSide.Buy:
-                        return Qty;
-                    case OrderSide.Sell:
-                        return -Qty;
-                    default:
-                        return 0;
-
-                }
+                    OrderSide.Buy => Qty,
+                    OrderSide.Sell => -Qty,
+                    _ => 0
+                };
             }
         }
 
@@ -56,6 +54,8 @@ namespace CommonStructures
             CumQty = from.CumQty;
             BrokerID = from.BrokerID;
             Symbol = from.Symbol;
+            ContractCode = from.ContractCode;
+            Exchange = from.Exchange;
             OrderSide = from.OrderSide;
             Qty = from.Qty;
             Price = from.Price;
@@ -77,6 +77,8 @@ namespace CommonStructures
                 CumQty = CumQty, 
                 BrokerID = BrokerID,
                 Symbol = Symbol,
+                ContractCode = ContractCode,
+                Exchange = Exchange,
                 OrderSide = OrderSide,
                 Qty = separatedQty,
                 Price = Price,
@@ -94,8 +96,8 @@ namespace CommonStructures
 
         public override string ToString()
         {
-            return string.Format(" ClOrdID={0}, OrderID={1}, BrokerID={2}, Symbol={3}, Side={4}, Qty={5}, Price={6}, CumQty={7}, ExecId={8}, Time={9}, ManualFillByUser={10}",
-                ClOrdId, OrderId, BrokerID, Symbol, OrderSide, Qty, Price, CumQty, ExecID, TransactTime, ManualFillByUser);
+            return
+                $" ClOrdID={ClOrdId}, OrderID={OrderId}, BrokerID={BrokerID}, Symbol={Symbol}, ContractCode = {ContractCode}, Exchange = {Exchange}, Side={OrderSide}, Qty={Qty}, Price={Price}, CumQty={CumQty}, ExecId={ExecID}, Time={TransactTime}, ManualFillByUser={ManualFillByUser}";
         }
     }
 }

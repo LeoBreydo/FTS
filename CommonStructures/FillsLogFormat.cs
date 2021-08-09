@@ -26,7 +26,7 @@ namespace CommonStructures
                     if (ixEq < 0)
                         yield return new Tuple<string, string>(nameVal.Trim(), string.Empty);
                     else
-                        yield return new Tuple<string, string>(nameVal.Substring(0, ixEq).Trim(), nameVal.Substring(ixEq + 1));
+                        yield return new Tuple<string, string>(nameVal[..ixEq].Trim(), nameVal[(ixEq + 1)..]);
                 }
             }
         }
@@ -39,7 +39,7 @@ namespace CommonStructures
                 while (pos<L)
                 {
                     int comma = GetNextComma(str, L, pos);
-                    yield return str.Substring(pos, comma - pos);
+                    if (pos >= 0 && str.Length > pos) yield return str[pos..comma];
                     pos = comma + 1;
                 }
             }
@@ -128,7 +128,7 @@ namespace CommonStructures
 
     public class UnwrappedTags
     {
-        public static UnwrappedTags Empty = new UnwrappedTags("");
+        public static UnwrappedTags Empty = new("");
         public readonly string Text;
         private Tuple<string, string>[] _tagsFields;
         public UnwrappedTags(string text)
@@ -183,15 +183,15 @@ namespace CommonStructures
             }
             return strVal.TryParseDateTime(out value);
         }
-        public bool TryGetTagValueTimeStamp(string tagName, out TimeStamp value)
+        public bool TryGetTagValueTimeStamp(string tagName, out DateTime value)
         {
             string strVal = GetTagValue(tagName, false);
             if (strVal == null)
             {
-                value = TimeStamp.Null;
+                value = DateTime.MinValue;
                 return false;
             }
-            return TimeStamp.TryParse(strVal, out value);
+            return DateTime.TryParse(strVal, out value);
         }
         public bool TryGetTagValueBool(string tagName,out bool value)
         {
@@ -217,15 +217,13 @@ namespace CommonStructures
 
         public long GetTagValueLong(string tagName)
         {
-            long res;
-            if (!TryGetTagValueLong(tagName, out res))
+            if (!TryGetTagValueLong(tagName, out var res))
                 throw new Exception(string.Format("Tag '{0}' is not specified or invalid", tagName));
             return res;
         }
         public double GetTagValueDouble(string tagName)
         {
-            double res;
-            if (!TryGetTagValueDouble(tagName, out res))
+            if (!TryGetTagValueDouble(tagName, out var res))
                 throw new Exception(string.Format("Tag '{0}' is not specified or invalid", tagName));
             return res;
         }
@@ -233,38 +231,31 @@ namespace CommonStructures
         {
             string strVal = GetTagValue(tagName, false);
             if (string.IsNullOrEmpty(strVal))
-                throw new Exception(string.Format("Tag '{0}' is not specified or invalid", tagName));
-            switch (strVal.ToLower())
+                throw new Exception($"Tag '{tagName}' is not specified or invalid");
+            return strVal.ToLower() switch
             {
-                case "true":
-                    return true;
-                case "false":
-                    return false;
-                default:
-                    throw new Exception(string.Format("Tag '{0}' is not specified or invalid", tagName));
-            }
+                "true" => true,
+                "false" => false,
+                _ => throw new Exception($"Tag '{tagName}' is not specified or invalid")
+            };
         }
         public bool GetTagValueBool(string tagName,bool toReturnIfTagNotExists)
         {
             string strVal = GetTagValue(tagName, false);
             if (strVal == null)
                 return toReturnIfTagNotExists;
-            switch (strVal.ToLower())
+            return strVal.ToLower() switch
             {
-                case "true":
-                    return true;
-                case "false":
-                    return false;
-                default:
-                    throw new Exception(string.Format("Tag '{0}' is not specified or invalid", tagName));
-            }
+                "true" => true,
+                "false" => false,
+                _ => throw new Exception(string.Format("Tag '{0}' is not specified or invalid", tagName))
+            };
         }
 
-        public TimeStamp GetTagValueTimeStamp(string tagName)
+        public DateTime GetTagValueTimeStamp(string tagName)
         {
-            TimeStamp res;
-            if (!TryGetTagValueTimeStamp(tagName, out res))
-                throw new Exception(string.Format("Tag '{0}' is not specified or invalid", tagName));
+            if (!TryGetTagValueTimeStamp(tagName, out var res))
+                throw new Exception($"Tag '{tagName}' is not specified or invalid");
             return res;
         }
 
@@ -309,7 +300,7 @@ namespace CommonStructures
 
         public static DateTime GetTimeOfTheMessage(string row, char delimiter = '\t')
         {
-            return TimeStamp.Parse(row.Substring(0, row.IndexOf(delimiter))).UtcDateTime;
+            return DateTime.Parse(row[..row.IndexOf(delimiter)]).ToUniversalTime();
         }
         public static ExecutionInfo FromTextTableRow(string row,char delimiter='\t')
         {
@@ -319,7 +310,7 @@ namespace CommonStructures
                 // back compability with the old format (when had no accounts)
                 return new ExecutionInfo
                            {
-                               Time = TimeStamp.Parse(cells[0]),
+                               Time = DateTime.Parse(cells[0]),
                                Symbol = cells[1],
                                StrategyID = long.Parse(cells[2]),
                                SymbolOpenedPosition = long.Parse(cells[3]),
@@ -328,13 +319,13 @@ namespace CommonStructures
                                FilledAmount = long.Parse(cells[6]),
                                FilledPrice = Math.Round(double.Parse(cells[7], CultureInfo.InvariantCulture), 10),
                                // the decimal error is possible when parse called
-                               TransactTime = TimeStamp.Parse(cells[8]),
+                               TransactTime = DateTime.Parse(cells[8]),
                                TagsText = cells[9]
                            };
             }
             return new ExecutionInfo
             {
-                Time = TimeStamp.Parse(cells[0]),
+                Time = DateTime.Parse(cells[0]),
                 Symbol = cells[1],
                 Account = cells[2],
                 StrategyID = long.Parse(cells[3]),
@@ -344,21 +335,18 @@ namespace CommonStructures
                 FilledAmount = long.Parse(cells[7]),
                 FilledPrice = Math.Round(double.Parse(cells[8], CultureInfo.InvariantCulture), 10),
                 // the decimal error is possible when parse called
-                TransactTime = TimeStamp.Parse(cells[9]),
+                TransactTime = DateTime.Parse(cells[9]),
                 TagsText = cells[10]
             };
 
         }
         private static ExecutionInfoType ParseExecutionInfoType(string strType)
         {
-            switch (strType)
+            return strType switch
             {
-                case "WorkingState":
-                    return ExecutionInfoType.StateUpdated;
-                    
-                default:
-                    return (ExecutionInfoType) Enum.Parse(typeof (ExecutionInfoType), strType);
-            }
+                "WorkingState" => ExecutionInfoType.StateUpdated,
+                _ => (ExecutionInfoType) Enum.Parse(typeof(ExecutionInfoType), strType)
+            };
         }
 
         public const string TAG_BrokerID = "BrokerID";
@@ -414,14 +402,12 @@ namespace CommonStructures
 
         public static bool IsTextTag(string tagName)
         {
-            switch (tagName)
+            return tagName switch
             {
-                case TAG_ApplyError:
-                case TAG_RejReason:
-                    return true;
-                default:
-                    return false;
-            }
+                TAG_ApplyError => true,
+                TAG_RejReason => true,
+                _ => false
+            };
         }
 
 

@@ -32,7 +32,7 @@ namespace CommonStructures
         public static DateTime ParseDateTimeUtc(this string strTime,out bool isMillisecondSpecified)
         {
             //the format: 60=20120723-12:30:26.582 (millisec may by ommited)
-            int y = int.Parse(strTime.Substring(0, 4));
+            int y = int.Parse(strTime[..4]);
             int M = int.Parse(strTime.Substring(4, 2));
             int d = int.Parse(strTime.Substring(6, 2));
 
@@ -54,7 +54,7 @@ namespace CommonStructures
         public static DateTime ParseIBDateTime(this string strTime)
         {
             //the format: 20120723  12:30:26
-            int y = int.Parse(strTime.Substring(0, 4));
+            int y = int.Parse(strTime[..4]);
             int M = int.Parse(strTime.Substring(4, 2));
             int d = int.Parse(strTime.Substring(6, 2));
 
@@ -66,7 +66,7 @@ namespace CommonStructures
         public static DateTime ParseDateTimeUtc(this string strTime)
         {
             //the format: 60=20120723-12:30:26.582 (millisec may by ommited)
-            int y = int.Parse(strTime.Substring(0, 4));
+            int y = int.Parse(strTime[..4]);
             int M = int.Parse(strTime.Substring(4, 2));
             int d = int.Parse(strTime.Substring(6, 2));
 
@@ -98,15 +98,14 @@ namespace CommonStructures
                 if (strTime.Length != 17 && strTime.Length != 21) return false;
 
                 //the format: 60=20120723-12:30:26.582 (millisec may by ommited)
-                int y, M, d;
-                int h, m, s, ms;
-                if (!int.TryParse(strTime.Substring(0, 4), out y) || y < 1601) return false;
-                if (!int.TryParse(strTime.Substring(4, 2), out M) || M < 1 || M > 12) return false;
-                if (!int.TryParse(strTime.Substring(6, 2), out d) || d < 1 || d > 31) return false;
+                int ms;
+                if (!int.TryParse(strTime[..4], out var y) || y < 1601) return false;
+                if (!int.TryParse(strTime.Substring(4, 2), out var M) || M < 1 || M > 12) return false;
+                if (!int.TryParse(strTime.Substring(6, 2), out var d) || d < 1 || d > 31) return false;
 
-                if (!int.TryParse(strTime.Substring(9, 2), out h) || h < 0 || h > 23) return false;
-                if (!int.TryParse(strTime.Substring(12, 2), out m) || m < 0 || h > 59) return false;
-                if (!int.TryParse(strTime.Substring(15, 2), out s) || s < 0 || s > 59) return false;
+                if (!int.TryParse(strTime.Substring(9, 2), out var h) || h < 0 || h > 23) return false;
+                if (!int.TryParse(strTime.Substring(12, 2), out var m) || m < 0 || h > 59) return false;
+                if (!int.TryParse(strTime.Substring(15, 2), out var s) || s < 0 || s > 59) return false;
                 if (strTime.Length == 17)
                     ms = 0;
                 else
