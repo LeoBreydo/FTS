@@ -416,7 +416,7 @@ namespace BrokerFacadeIB
             if (oi == null)
             {
                 if (msg.ReqId > 0) // historical exec report
-                    AddMessage("INFO","Ignore obsolette historical ExecReport: " + ExecToStr(msg));
+                    AddMessage("INFO","Ignore obsolete historical ExecReport: " + ExecToStr(msg));
                 else
                 {
                     _orderReportQueue.Add(new OrderFillReport(new FillsItem

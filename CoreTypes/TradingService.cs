@@ -1,27 +1,26 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Linq.Expressions;
-using System.Threading.Channels;
 using Messages;
 
 namespace CoreTypes
 {
     public class TradingService : ICommandReceiver
     {
-        private const int InternalId = 1; // always!
+        private const int InternalId = 0; // always!
 
         #region structure
-
-        public Dictionary<string, ExchangeTrader> Exchanges { get; } = new();
-        public Dictionary<string, CurrencyPosition> Positions = new();
-        public readonly Dictionary<int, ICommandReceiver> CommandReceivers = new();
+        // it seems that sorted list is faster than dictionary for static collections
+        public SortedList<string, ExchangeTrader> Exchanges { get; } = new();
+        public SortedList<string, CurrencyPosition> Positions = new();
+        public readonly SortedList<int, ICommandReceiver> CommandReceivers = new();
         // key: marketCode+exchange
-        private readonly Dictionary<string, PriceProvider> _priceProviderMap = new();
-        private readonly Dictionary<string, BarAggregator> _barAggregatorMap = new();
-        private readonly Dictionary<string, ContractDetailsManager> _contactManagers = new();
+        private readonly SortedList<string, PriceProvider> _priceProviderMap = new();
+        private readonly SortedList<string, BarAggregator> _barAggregatorMap = new();
+        private readonly SortedList<string, ContractDetailsManager> _contactManagers = new();
 
         // clOrderId -> Idx of MarketTrader
+        // it is dynamical collection, so - dictionary
         private readonly Dictionary<int, MarketTrader> _reportsRoutingMap = new();
 
         private void RegisterExchangeTrader(ExchangeTrader ct)
@@ -67,28 +66,34 @@ namespace CoreTypes
         private readonly ServiceRestrictionsManager _restrictionManager = new();
         private TradingRestriction _currentRestriction;
 
+        private readonly ErrorCollector _errorCollector;
+        private DateTime _lastDayStart = DateTime.UtcNow.AddDays(-1);
+
         public TradingService(TradingConfiguration cfg)
         {
             _currentRestriction = _restrictionManager.GetCurrentRestriction();
+            CommandReceivers.Add(InternalId,this);
+            _errorCollector = new ErrorCollector(cfg.MaxErrorsPerDay);
         }
 
 
         public (List<(string, string)> subscriptions, List<MarketOrderDescription> orders, TradingServiceState state)
-            ProcessCurrentState(StateObject so, List<ICommand> clCmdList, List<ICommand> schCmdList)
+            ProcessCurrentState(StateObject so, List<ICommand> clCmdList, List<ICommand> schCmdList, bool forgetErrors=false)
         {
             if (clCmdList?.Count > 0) ApplyCommands(clCmdList);
             if (schCmdList?.Count > 0) ApplyCommands(schCmdList);
             ApplyNewTicks(so);
             var newBars = MakeNewOneMinuteBars(so);
             // TODO inject new bars (and ticks?) to indicator container
-            var newTrades = ApplyOrderReports(so, out var errorMessages);
+            var newTrades = ApplyOrderReports(so, out var errorMessages, out int errorsNbr);
+            UpdateErrorCollector(so, forgetErrors, errorsNbr);
             UpdateProfitLossInfos();
             var subscriptionList = ProcessContractInfos(so);
             UpdateParentRestrictions();
             // TODO realize GetCurrentState(so) - now it is just a stub
             TradingServiceState currentState = GetCurrentState(so);
-            // TODO log all information - ticks, bars, trades, reports etc
-            // some logging library?
+            // TODO log all information - ticks, bars, trades, reports, errorMessages etc
+            // TODO push errorMessages to client
             var ordersToPost = GenerateOrders(so.CurrentUtcTime, newTrades);
             return (
                 subscriptions: subscriptionList,
@@ -99,6 +104,20 @@ namespace CoreTypes
 
         #region privates
 
+        private void UpdateErrorCollector(StateObject so, bool forgetErrors, int errorsNbr)
+        {
+            if ((so.CurrentUtcTime - _lastDayStart).TotalDays >= 1)
+            {
+                _errorCollector.Reset();
+                _lastDayStart = so.CurrentUtcTime;
+            }
+
+            _errorCollector.ApplyErrors(errorsNbr);
+            if (forgetErrors) _errorCollector.Reset();
+            _restrictionManager.SetErrorsNbrRestriction(_errorCollector.IsStopped
+                ? TradingRestriction.HardStop
+                : TradingRestriction.NoRestrictions);
+        }
         private TradingServiceState GetCurrentState(StateObject so) => new TradingServiceState();
         private List<MarketOrderDescription> GenerateOrders(DateTime utcNow, List<Trade> newTrades)
         {
@@ -120,7 +139,7 @@ namespace CoreTypes
         {
             foreach (var kvp in Positions) kvp.Value.Update();
         }
-        private List<Trade> ApplyOrderReports(StateObject so, out List<string> errorMessages)
+        private List<Trade> ApplyOrderReports(StateObject so, out List<string> errorMessages, out int errorsNbr)
         {
             static string ReportUnknownExecution(OrderReportBase report)
             {
@@ -164,6 +183,8 @@ namespace CoreTypes
                     default: return "OrderReport for unknown order detected";
                 }
             }
+
+            errorsNbr = 0;
             errorMessages = new();
             if (so.OrderReportBaseList.Count == 0) return null;
             List<Trade> newTrades = new();
@@ -171,13 +192,33 @@ namespace CoreTypes
             foreach (var report in so.OrderReportBaseList)
             {
                 if (!_reportsRoutingMap.ContainsKey(report.ClOrdID))
+                {
                     errorMessages.Add(ReportUnknownExecution(report));
+                    errorsNbr++;
+                }
                 else
                 {
-                    var (tradeList, isOrderFinished) = _reportsRoutingMap[report.ClOrdID].ApplyOrderReport(so.CurrentUtcTime, report);
+                    var (tradeList, isOrderFinished) = _reportsRoutingMap[report.ClOrdID].ApplyOrderReport(so.CurrentUtcTime, 
+                        report, out var errorMessage);
+                    if (errorMessage != null)
+                    {
+                        errorMessages.Add(errorMessage);
+                        errorsNbr++;
+                    }
                     if (isOrderFinished) _reportsRoutingMap.Remove(report.ClOrdID);
                     if (tradeList?.Count > 0) newTrades.AddRange(tradeList);
                 }
+            }
+            // timeout management
+            foreach (var cm in _contactManagers.Values)
+            {
+                var msgList = cm.ApplyCurrentTime(so.CurrentUtcTime, out var idList);
+                foreach (var id in idList.Where(id => _reportsRoutingMap.ContainsKey(id)))
+                {
+                    _reportsRoutingMap.Remove(id);
+                    errorsNbr++;
+                }
+                if(msgList.Count > 0) errorMessages.AddRange(msgList);
             }
             return newTrades;
         }

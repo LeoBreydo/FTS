@@ -103,6 +103,7 @@ namespace CoreTypes
         public long NextStrategyID { get; set; }
         public GeneralSettings GeneralSettings { get; set; } = new();
         public List<ExchangeConfiguration> Exchanges { get; set; } = new();
+        public int MaxErrorsPerDay = 0;
 
         public string Verify()
         {
@@ -110,6 +111,7 @@ namespace CoreTypes
             var error = GeneralSettings.Verify();
             if (error != null) return "Invalid General Settings: " + error;
             if (Exchanges == null || Exchanges.Count == 0) return "Exchanges are undefined";
+            if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
 
             var strategyIDs = new List<long>();
             var strategyNames = new List<string>();

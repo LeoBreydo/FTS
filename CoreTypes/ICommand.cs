@@ -85,7 +85,8 @@ namespace CoreTypes
         Parent = 3,
         EndOfContract = 4,
         EndOfSession = 5,
-        Error = 6
+        Error = 6,
+        ErrorsNbr = 7
     }
     public static class RSourceEx
     {

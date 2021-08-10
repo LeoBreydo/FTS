@@ -66,7 +66,7 @@ namespace CoreTypes
         #region structure
         public List<StrategyTrader> Strategies { get; } = new();
         public Dictionary<int, StrategyTrader> StrategyMap { get; } = new();
-        public Dictionary<int, List<StrategyOrderInfo>> PostedOrderMap { get; } = new();
+        public Dictionary<int, (List<StrategyOrderInfo>,DateTime)> PostedOrderMap { get; } = new();
         public void RegisterStrategyTrader(StrategyTrader st)
         {
             StrategyMap.Add(st.InternalID, st);
@@ -108,11 +108,11 @@ namespace CoreTypes
         {
             return OrderGenerator.GenerateOrders(this, utcNow);
         }
-        public (List<Trade> tlist, bool isOrderFinished) ApplyOrderReport(DateTime utcTime, OrderReportBase report)
+        public (List<Trade> tlist, bool isOrderFinished) ApplyOrderReport(DateTime utcTime, OrderReportBase report, out string errorMessage)
         {
-            return OrderReportsProcessor.ApplyOrderReport(this, utcTime, report);
+            return OrderReportsProcessor.ApplyOrderReport(this, utcTime, report, out errorMessage);
         }
-        public static List<Trade> SendPartialVirtualFill(StrategyTrader s, decimal quote,
+        public static List<Trade> ApplyPartialVirtualFill(StrategyTrader s, decimal quote,
             DateTime utcNow, int virtuallyFilled, string clOrderId, int clBasketId)
         {
             var r =
@@ -122,7 +122,7 @@ namespace CoreTypes
             s.CurrentOperationAmount -= virtuallyFilled;
             return t;
         }
-        public static List<Trade> SendVirtualFill(StrategyTrader s, decimal quote, DateTime utcNow,
+        public static List<Trade> ApplyVirtualFill(StrategyTrader s, decimal quote, DateTime utcNow,
             string clOrderID, int clBasketID)
         {
             var r =
@@ -131,6 +131,68 @@ namespace CoreTypes
             var t = s.Position.ProcessNewDeals(r);
             s.CurrentOperationAmount = 0;
             return t;
+        }
+
+        public static List<Trade> ApplyRealFill(StrategyTrader s, decimal quote, DateTime utcNow,
+            string clOrderID, int clBasketID, int amount)
+        {
+            var opAmountBefore = s.CurrentOperationAmount;
+            var r =
+                new List<(Execution, int)>
+                    {(new Execution(clOrderID, clBasketID, utcNow, quote), amount)};
+            var t = s.Position.ProcessNewDeals(r);
+            if (opAmountBefore == 0) // no operation expected
+            {
+                if (amount != 0) // but something is executed
+                {
+                    s.CurrentOperationAmount = 0;
+                    s.OffsetDealAmount = -amount;
+                }
+            }
+            else if (amount != 0 && Math.Sign(opAmountBefore) != Math.Sign(amount)) 
+            {
+                // buy/sell mismatch
+                s.CurrentOperationAmount = 0;
+                s.OffsetDealAmount = -amount;
+            }
+            else
+            {
+                s.CurrentOperationAmount -= amount;
+                if (s.CurrentOperationAmount != 0 && opAmountBefore * s.CurrentOperationAmount < 0)
+                {
+                    // operation is overfilled
+                    s.OffsetDealAmount = -s.CurrentOperationAmount;
+                    s.CurrentOperationAmount = 0;
+                }
+            }
+            return t;
+        }
+
+        public List<string> ApplyCurrentTime(DateTime currentUtcTime, out List<int> idList)
+        {
+            idList = new();
+            List<string> messages = new();
+            List<int> keysToRemove = new();
+            foreach (var kvp in PostedOrderMap)
+            {
+                if ((currentUtcTime - kvp.Value.Item2).TotalMinutes >= 3)
+                {
+                    foreach (var b in kvp.Value.Item1)
+                    {
+                        var s = StrategyMap[b.StrategyId];
+                        s.CurrentOperationAmount = 0;
+                        messages.Add($"order for strategy (id is {s.Id}) was cancelled by timeout");
+                    }
+                    keysToRemove.Add(kvp.Key);
+                }
+            }
+
+            foreach (var key in keysToRemove)
+            {
+                PostedOrderMap.Remove(key);
+                idList.Add(key);
+            }
+            return messages;
         }
     }
 
@@ -142,6 +204,7 @@ namespace CoreTypes
         public StrategyPosition Position { get; private set; }
         public int CurrentOperationAmount { get; set; } = 0;
         public int ContractsNbr { get; set; } = 1;
+        public int OffsetDealAmount = 0; // mandatory execution!!
 
         private Signal _lastSignal;
         private readonly StrategyRestrictionsManager _restrictionsManager = new();
@@ -162,21 +225,20 @@ namespace CoreTypes
             switch (command)
             {
                 case RestrictionCommand restrictionCommand:
+                {
+                    var r = restrictionCommand.Restriction;
+                    switch (s)
                     {
-                        var r = restrictionCommand.Restriction;
-                        switch (s)
-                        {
-                            case CommandSource.User:
-                                _restrictionsManager.SetUserRestriction(r);
-                                break;
-                            case CommandSource.Scheduler:
-                                _restrictionsManager.SetSchedulerRestriction(r);
-                                break;
-                        }
+                        case CommandSource.User:
+                            _restrictionsManager.SetUserRestriction(r);
+                            break;
+                        case CommandSource.Scheduler:
+                            _restrictionsManager.SetSchedulerRestriction(r);
+                            break;
                     }
+                }
                     break;
                 case OrderForgetCommand forgetCommand:
-
                     break;
                 case OrderRepeatCommand repeatCommand:
                     break;
@@ -201,20 +263,22 @@ namespace CoreTypes
             if (_lastSignal == Signal.TO_FLAT || _currentRestriction == TradingRestriction.HardStop)
             {
                 CurrentOperationAmount = -Position.Size;
+                OffsetDealAmount = 0;
                 return;
             }
 
             if (_currentRestriction == TradingRestriction.SoftStop)
             {
                 if (_lastSignal == Signal.TO_LONG)
-                    CurrentOperationAmount = Position.Size >= 0 ? 0 : -Position.Size;
+                    CurrentOperationAmount = Position.Size >= 0 ? OffsetDealAmount : -Position.Size;
                 else // last signal = Signal.TO_SHORT
-                    CurrentOperationAmount = Position.Size <= 0 ? 0 : -Position.Size;
-
+                    CurrentOperationAmount = Position.Size <= 0 ? OffsetDealAmount : -Position.Size;
+                OffsetDealAmount = 0;
                 return;
             }
 
-            CurrentOperationAmount = ((int)_lastSignal) * ContractsNbr - Position.Size;
+            CurrentOperationAmount = ((int)_lastSignal) * ContractsNbr - Position.Size + OffsetDealAmount;
+            OffsetDealAmount = 0;
         }
 
         public StrategyOrderInfo GenerateOrder((decimal bid, decimal ask, decimal last) lastQuotations)
@@ -227,8 +291,13 @@ namespace CoreTypes
                 if (newSignal != Signal.NO_SIGNAL) _lastSignal = newSignal;
                 return new StrategyOrderInfo(InternalID, 0);
             }
+
             if (_lastSignal == Signal.NO_SIGNAL) // no signal at the moment
-                return new StrategyOrderInfo(InternalID, 0);
+            {
+                var amount = OffsetDealAmount != 0 ? OffsetDealAmount : 0;
+                OffsetDealAmount = 0;
+                return new StrategyOrderInfo(InternalID, amount);
+            }
             SetOrderSize(lastQuotations.last);
             _lastSignal = Signal.NO_SIGNAL;
             return new StrategyOrderInfo(InternalID, CurrentOperationAmount);

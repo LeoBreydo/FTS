@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using TimeZoneConverter;
 
 namespace CoreTypes
@@ -101,5 +102,9 @@ namespace CoreTypes
                     _currentContract.EndLiquidHours.Hour, _currentContract.EndLiquidHours.Minute, 0);
         }
 
+        public List<string> ApplyCurrentTime(DateTime currentUtcTime, out List<int> idList)
+        {
+            return _owner.ApplyCurrentTime(currentUtcTime, out idList);
+        }
     }
 }

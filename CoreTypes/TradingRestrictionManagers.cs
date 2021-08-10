@@ -47,6 +47,9 @@ namespace CoreTypes
 
         public void SetUserRestriction(TradingRestriction r) => 
             SetRestriction(r, CommandSource.User);
+
+        public void SetErrorsNbrRestriction(TradingRestriction r) =>
+            SetRestriction(r, CommandSource.ErrorsNbr);
     }
 
     public class ExchangeRestrictionsManager : TradingRestrictionManager

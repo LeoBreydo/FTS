@@ -23,7 +23,7 @@ namespace CoreTypes
                 var amount = unfilledOrders.Sum(o => o.NbrOfContracts);
                 if (amount != 0)
                 {
-                    caller.PostedOrderMap.Add(basketID, unfilledOrders);
+                    caller.PostedOrderMap.Add(basketID, (unfilledOrders,utcNow));
                     return (caller,
                         new MarketOrderDescription(basketID, caller.MarketCode, caller.Exchange, amount),
                         trades);
@@ -45,12 +45,12 @@ namespace CoreTypes
                     var rest = virtuallyFilled - o.NbrOfContracts;
                     if (rest >= 0)
                     {
-                        var tl = MarketTrader.SendVirtualFill(caller.StrategyMap[o.StrategyId], virtualExecutionQuote, utcNow, clOrderId, clBasketId);
+                        var tl = MarketTrader.ApplyVirtualFill(caller.StrategyMap[o.StrategyId], virtualExecutionQuote, utcNow, clOrderId, clBasketId);
                         if (tl.Count > 0) trades.AddRange(tl);
                     }
                     else
                     {
-                        var tl = MarketTrader.SendPartialVirtualFill(caller.StrategyMap[o.StrategyId], virtualExecutionQuote, utcNow,
+                        var tl = MarketTrader.ApplyPartialVirtualFill(caller.StrategyMap[o.StrategyId], virtualExecutionQuote, utcNow,
                             virtuallyFilled, clOrderId, clBasketId);
                         if (tl.Count > 0) trades.AddRange(tl);
                         break;
@@ -80,12 +80,12 @@ namespace CoreTypes
                 // all orders are executed virtually :)
                 foreach (var o in buyOrders)
                 {
-                    var tl = MarketTrader.SendVirtualFill(caller.StrategyMap[o.StrategyId], bid, utcNow, clOrderID, clBasketID);
+                    var tl = MarketTrader.ApplyVirtualFill(caller.StrategyMap[o.StrategyId], bid, utcNow, clOrderID, clBasketID);
                     if (tl.Count > 0) tList.AddRange(tl);
                 }
                 foreach (var o in sellOrders)
                 {
-                    var tl = MarketTrader.SendVirtualFill(caller.StrategyMap[o.StrategyId], bid, utcNow, clOrderID, clBasketID);
+                    var tl = MarketTrader.ApplyVirtualFill(caller.StrategyMap[o.StrategyId], bid, utcNow, clOrderID, clBasketID);
                     if (tl.Count > 0) tList.AddRange(tl);
                 }
 
@@ -100,7 +100,7 @@ namespace CoreTypes
                     // NB! only one 'buy' order can be executed partially
                     foreach (var o in sellOrders)
                     {
-                        var tl = MarketTrader.SendVirtualFill(caller.StrategyMap[o.StrategyId], bid, utcNow, clOrderID, clBasketID);
+                        var tl = MarketTrader.ApplyVirtualFill(caller.StrategyMap[o.StrategyId], bid, utcNow, clOrderID, clBasketID);
                         if (tl.Count > 0) tList.AddRange(tl);
                     }
                     sellOrders.Clear();
@@ -115,7 +115,7 @@ namespace CoreTypes
                 {
                     foreach (var o in buyOrders)
                     {
-                        var tl = MarketTrader.SendVirtualFill(caller.StrategyMap[o.StrategyId], bid, utcNow, clOrderID, clBasketID);
+                        var tl = MarketTrader.ApplyVirtualFill(caller.StrategyMap[o.StrategyId], bid, utcNow, clOrderID, clBasketID);
                         if (tl.Count > 0) tList.AddRange(tl);
                     }
                     buyOrders.Clear();
@@ -129,53 +129,126 @@ namespace CoreTypes
 
     public static class OrderReportsProcessor
     {
-        public static (List<Trade> tlist, bool isOrderFinished) ApplyOrderReport(MarketTrader owner, DateTime soCurrentUtcTime, OrderReportBase report)
+        public static (List<Trade> tlist, bool isOrderFinished) ApplyOrderReport(MarketTrader owner,
+            DateTime utcNow, OrderReportBase report, out string errorMessage)
         {
+            errorMessage = null;
             var clId = report.ClOrdID;
             (List<Trade> tlist, bool isOrderFinished) ret = new();
-            if (!owner.PostedOrderMap.ContainsKey(clId))
-            {
-                // error
-            }
-
             switch (report.MessageNumber)
             {
                 case (int)MessageNumbers.OrderPosting:
-                    // message to log
                     break;
                 case (int)MessageNumbers.AcknowledgementReport:
-                    // message to log
                     break;
                 case (int)MessageNumbers.RejectionReport:
-                    // how to handle?
+                    ret = Handle(owner, (RejectionReport)report, utcNow, out errorMessage);
                     break;
                 case (int)MessageNumbers.OrderPostRejection:
-                    //HandleOrderPostRejection(report);
+                    ret = Handle(owner, (OrderPostRejection)report, utcNow, out errorMessage);
                     break;
                 case (int)MessageNumbers.OrderPosted:
-                    // message to ?
                     break;
                 case (int)MessageNumbers.OrderStoppedReport:
                     // execution takes to much time - client must decide (wait/forget)
+                    ret = Handle(owner, (OrderStoppedReport)report, utcNow, out errorMessage);
                     break;
                 case (int)MessageNumbers.OrderFillReport:
-                    ret = HandleFill(owner, (OrderFillReport)report);
+                    ret = Handle(owner, (OrderFillReport)report, utcNow, out errorMessage);
                     break;
             }
 
             return ret;
         }
 
-        private static (List<Trade> tlist, bool isOrderFinished) HandleFill(MarketTrader owner, OrderFillReport report)
+        private static (List<Trade> tlist, bool isOrderFinished) Handle(MarketTrader owner, 
+            OrderStoppedReport report, DateTime utcNow, out string errorMessage)
         {
+            errorMessage =
+                $"Execution of order(order id is {report.OrderID}  for contract (contract code is {owner.ContractCode} was stopped by timeout";
+            var clOrdId = report.ClOrdID;
+            if (owner.PostedOrderMap.ContainsKey(clOrdId))
+            {
+                // 1) cancel operation amounts
+                var bindings = owner.PostedOrderMap[clOrdId].Item1;
+                foreach (var b in bindings) owner.StrategyMap[b.StrategyId].CurrentOperationAmount = 0;
+                // 2) remove order from postedOrdersMap
+                owner.PostedOrderMap.Remove(clOrdId);
+            }
+            // 3) mark order as executed
+            return (
+                tlist: new(),
+                isOrderFinished: true
+            );
+        }
+
+        private static (List<Trade> tlist, bool isOrderFinished) Handle(MarketTrader owner, 
+            OrderPostRejection report, DateTime utcNow, out string errorMessage)
+        {
+            errorMessage =
+                $"Order for contract (contract code is {owner.ContractCode} was rejected by {report.RejectionReason}";
+            var clOrdId = report.ClOrdID;
+            if (owner.PostedOrderMap.ContainsKey(clOrdId))
+            {
+                // 1) cancel operation amounts
+                var bindings = owner.PostedOrderMap[clOrdId].Item1;
+                foreach (var b in bindings) owner.StrategyMap[b.StrategyId].CurrentOperationAmount = 0;
+                // 2) remove order from postedOrdersMap
+                owner.PostedOrderMap.Remove(clOrdId);
+            }
+            // 3) mark order as executed
+            return (
+                tlist: new(),
+                isOrderFinished: true
+            );
+        }
+
+        private static (List<Trade> tlist, bool isOrderFinished) Handle(MarketTrader owner, 
+            RejectionReport report, DateTime utcNow, out string errorMessage)
+        {
+            errorMessage =
+                $"Order (id = {report.OrderID}) for contract (contract code is {owner.ContractCode} was rejected by {report.RejectionReason}";
+            var clOrdId = report.ClOrdID;
+            if (owner.PostedOrderMap.ContainsKey(clOrdId))
+            {
+                // 1) cancel operation amounts
+                var bindings = owner.PostedOrderMap[clOrdId].Item1;
+                foreach (var b in bindings) owner.StrategyMap[b.StrategyId].CurrentOperationAmount = 0;
+                // 2) remove order from postedOrdersMap
+                owner.PostedOrderMap.Remove(clOrdId);
+            }
+            // 3) mark order as executed
+            return (
+                tlist: new(),
+                isOrderFinished: true
+            );
+        }
+
+        private static (List<Trade> tlist, bool isOrderFinished) Handle(MarketTrader owner, 
+            OrderFillReport report, DateTime utcNow, out string errorMessage)
+        {
+            errorMessage = null;
             var trades = new List<Trade>();
             var clOrdId = report.ClOrdID;
             if (!owner.PostedOrderMap.ContainsKey(clOrdId))
             {
-                // process error and
+                // unknown order detected
+                // 1) apply fill to first available strategy
+                if ((int) report.Fill.SgnQty != 0)
+                {
+                    var t = MarketTrader.ApplyRealFill(owner.StrategyMap.First().Value, (decimal) report.Fill.Price,
+                        report.Fill.TransactTime,
+                        report.Fill.ExecID, report.Fill.OrderId, (int) report.Fill.SgnQty);
+                    if (t.Count > 0) trades.AddRange(t);
+                    // 2) generate error message to client/log
+                    errorMessage =
+                        $"Execution error detected - unexpected operation for {owner.ContractCode} for {(int)report.Fill.SgnQty} contracts was executed (order id is {report.OrderID}). Offset deal is auto-generated.";
+                }
+
+                // 3) mark order as executed
                 return (
                     tlist: trades,
-                    isOrderFinished: false
+                    isOrderFinished: true
                 );
             }
 
@@ -187,12 +260,22 @@ namespace CoreTypes
                 );
             }
 
-            var bindings = owner.PostedOrderMap[clOrdId];
+            var bindings = owner.PostedOrderMap[clOrdId].Item1;
             var total = bindings.Sum(b => b.NbrOfContracts);
             if (total == 0)
             {
+                // rather impossible situation
+                // 1) apply fill to the first available strategy,
+                var t = MarketTrader.ApplyRealFill(owner.StrategyMap.First().Value, (decimal)report.Fill.Price,
+                    report.Fill.TransactTime,
+                    report.Fill.ExecID, report.Fill.OrderId, (int)report.Fill.SgnQty);
+                if (t.Count > 0) trades.AddRange(t);
+                // 2) generate error message to client/log
+                errorMessage =
+                    $"Execution error detected - no operation was expected for {owner.ContractCode}, but deal for {(int) report.Fill.SgnQty} contracts was executed (order id is {report.OrderID}). Offset deal is auto-generated.";
+                // 3) remove order from postedOrdersMap
                 owner.PostedOrderMap.Remove(clOrdId);
-                // error
+                // 4) mark order as executed
                 return (
                     tlist: trades,
                     isOrderFinished: true
@@ -201,19 +284,50 @@ namespace CoreTypes
             var cnt = (int)report.Fill.SgnQty;
             if (Math.Sign(total) != Math.Sign(cnt))
             {
-                // error
+                // error processing:
+                //1)apply fill to the first binding
+                var t = MarketTrader.ApplyRealFill(owner.StrategyMap.[bindings[0].StrategyId], (decimal)report.Fill.Price,
+                    report.Fill.TransactTime,
+                    report.Fill.ExecID, report.Fill.OrderId, (int)report.Fill.SgnQty);
+                if (t.Count > 0) trades.AddRange(t);
+                //2)generate error message to client/log
+                errorMessage =
+                    $"Execution error detected - buy/sell mismatch for {owner.ContractCode} (order id is {report.OrderID}). Offset deal is auto-generated.";
+                //3)cancel waiting orders at all others bindings 
+                var bcnt = bindings.Count;
+                for (var i = 1; i < bcnt; ++i) owner.StrategyMap[bindings[i].StrategyId].CurrentOperationAmount = 0;
+                //4)remove order from postedOrdersMap
+                owner.PostedOrderMap.Remove(clOrdId);
+                //5)mark order as executed
                 return (
                     tlist: trades,
-                    isOrderFinished: false
+                    isOrderFinished: true
                 );
             }
 
             if (Math.Abs(cnt) > Math.Abs(total))
             {
-                //error
+                //error processing:
+                //1) sequentially apply fill to bindings (last binding will be overfilled)
+                var surplus = Math.Sign(cnt) * (Math.Abs(cnt) - Math.Abs(total));
+                var bcnt = bindings.Count;
+                for (var i = 0; i < bcnt; ++i)
+                {
+                    var s = owner.StrategyMap[bindings[i].StrategyId];
+                    var amount = i == bcnt - 1 ? s.CurrentOperationAmount + surplus : s.CurrentOperationAmount;
+                    var t = MarketTrader.ApplyRealFill(s, (decimal) report.Fill.Price,
+                        report.Fill.TransactTime,
+                        report.Fill.ExecID, report.Fill.OrderId, amount);
+                    if(t.Count > 0) trades.AddRange(t);
+                }
+                //2)generate error message to client/log
+                errorMessage = $"Execution error detected - order for {owner.ContractCode} is overfilled by {surplus}  contracts (order id is {report.OrderID}). Offset deal is auto-generated."
+                //3)remove order from postedOrdersMap
+                owner.PostedOrderMap.Remove(clOrdId);
+                //4)mark order as executed
                 return (
                     tlist: trades,
-                    isOrderFinished: false
+                    isOrderFinished: true
                 );
             }
 
@@ -222,18 +336,17 @@ namespace CoreTypes
                 if (Math.Abs(cnt) >= Math.Abs(b.NbrOfContracts))
                 {
                     cnt -= b.NbrOfContracts;
-                    var t = owner.SendVirtualFill(owner.StrategyMap[b.StrategyId], (decimal)report.Fill.Price,
+                    var t = MarketTrader.ApplyRealFill(owner.StrategyMap[b.StrategyId], (decimal)report.Fill.Price,
                         report.Fill.TransactTime,
-                        report.Fill.ExecID, report.Fill.OrderId);
+                        report.Fill.ExecID, report.Fill.OrderId, b.NbrOfContracts);
                     if (t.Count > 0) trades.AddRange(t);
                     b.NbrOfContracts = 0;
                 }
                 else
                 {
                     if (cnt == 0) break;
-                    var t = owner.SendPartialVirtualFill(owner.StrategyMap[b.StrategyId], (decimal)report.Fill.Price,
-                        report.Fill.TransactTime, cnt,
-                        report.Fill.ExecID, report.Fill.OrderId);
+                    var t = MarketTrader.ApplyRealFill(owner.StrategyMap[b.StrategyId], (decimal)report.Fill.Price,
+                        report.Fill.TransactTime, report.Fill.ExecID, report.Fill.OrderId, cnt);
                     if (t.Count > 0) trades.AddRange(t);
                     b.NbrOfContracts -= cnt;
                     break;
@@ -248,6 +361,8 @@ namespace CoreTypes
                     isOrderFinished: true
                 );
             }
+            var strategyOrderInfos = owner.PostedOrderMap[clOrdId].Item1;
+            owner.PostedOrderMap[clOrdId] = (strategyOrderInfos, utcNow);
             return (
                 tlist: trades,
                 isOrderFinished: false
