@@ -17,6 +17,16 @@ namespace CoreTypes
         {
             return (int)r;
         }
+
+        public static string AsString(this TradingRestriction r)
+        {
+            return r switch
+            {
+                TradingRestriction.HardStop => "HardStop",
+                TradingRestriction.SoftStop => "SoftStop",
+                _ => "NoRestriction"
+            };
+        }
     }
 
     public class TradingRestrictionManager
@@ -36,6 +46,15 @@ namespace CoreTypes
                 .Select((r, i) => ((CommandSource) i, r))
                 .Where(t => t.Item2 != TradingRestriction.NoRestrictions)
                 .ToList();
+
+        public string GetRestrictions()
+        {
+            return string.Join(",", _restrictions.Select((tr, i) => tr == TradingRestriction.NoRestrictions
+                ? string.Empty
+                : $"{tr.AsString()} by {((CommandSource) i).AsString()}")
+                .Where(s=>s != string.Empty)
+                .ToList());
+        }
 
 
     }

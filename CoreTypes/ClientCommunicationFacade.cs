@@ -4,12 +4,12 @@ namespace CoreTypes
 {
     public class ClientCommunicationFacade
     {
-        public void PushInfo(List<string> msgList, TradingServiceState state)
+        public void PushInfo(TradingServiceState state)
         {
 
         }
 
-        public List<Command> GetCommands()
+        public List<ICommand> GetCommands()
         {
             return new();
         }

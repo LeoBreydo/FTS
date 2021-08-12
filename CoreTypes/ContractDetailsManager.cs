@@ -10,7 +10,7 @@ namespace CoreTypes
         private DateTime _lastReqDateTime;
         private DateTime _previousSessionStart;
         private bool _processRightNow = true;
-        private MarketTrader _owner;
+        private readonly MarketTrader _owner;
 
         public ContractDetailsManager(MarketTrader owner)
         {
@@ -19,18 +19,24 @@ namespace CoreTypes
             _owner = owner;
         }
 
-        public (string markeCode, string exchange) ProcessContractInfo(ContractInfo ci, DateTime utcNow)
+        public (string markeCode, string exchange, string error) ProcessContractInfo(ContractInfo ci, DateTime utcNow)
         {
+            string err = string.Empty;
             var ret = (
                 marketCode: string.Empty,
-                exchange: string.Empty
+                exchange: string.Empty,
+                error: string.Empty
             );
             if (ci != null)
             {
                 _processRightNow = false;
                 _currentContract = ci;
                 _owner.ContractCode = ci.LocalSymbol;
-                AdjustDateTimes();
+                if (!AdjustDateTimes())
+                {
+                    _currentContract = null;
+                    err = $"Unknown time zone id detected for {_owner.Exchange}";
+                }
             }
             else
             {
@@ -50,7 +56,8 @@ namespace CoreTypes
                     _lastReqDateTime = utcNow;
                     ret = (
                         marketCode: _owner.MarketCode,
-                        exchange: _owner.Exchange
+                        exchange: _owner.Exchange,
+                        error: err
                     );
                 }
             }
@@ -71,7 +78,8 @@ namespace CoreTypes
                     _lastReqDateTime = utcNow;
                     ret = (
                         marketCode: _owner.MarketCode,
-                        exchange: _owner.Exchange
+                        exchange: _owner.Exchange,
+                        error: string.Empty
                     );
                 }
 
@@ -85,9 +93,10 @@ namespace CoreTypes
             return ret;
         }
 
-        private void AdjustDateTimes()
+        private bool AdjustDateTimes()
         {
             var tzi = TZConvert.GetTimeZoneInfo(_currentContract.TimeZoneId);
+            if (tzi == null) return false;
             var dt = DateTime.SpecifyKind(_currentContract.StartLiquidHours, DateTimeKind.Unspecified);
             _currentContract.StartLiquidHours = TimeZoneInfo.ConvertTimeToUtc(dt, tzi);
             dt = DateTime.SpecifyKind(_currentContract.EndLiquidHours, DateTimeKind.Unspecified);
@@ -100,6 +109,7 @@ namespace CoreTypes
             _currentContract.LastTradeTime =
                 new DateTime(dt.Year, dt.Month, dt.Day,
                     _currentContract.EndLiquidHours.Hour, _currentContract.EndLiquidHours.Minute, 0);
+            return true;
         }
 
         public List<string> ApplyCurrentTime(DateTime currentUtcTime, out List<int> idList)

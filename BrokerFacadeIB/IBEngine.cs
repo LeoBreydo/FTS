@@ -27,7 +27,6 @@ namespace BrokerFacadeIB
         private CancellationTokenSource lcts;
 
         private readonly BlockingCollection<Tuple<string, string>> _textMsgQueue = new();
-        private readonly BlockingCollection<BaseMessage> _baseMsgQueue = new();
         public void AddMessage(string tag, string message)
         {
             _textMsgQueue.Add(new Tuple<string, string>(tag,message));
@@ -48,7 +47,7 @@ namespace BrokerFacadeIB
 
             Dictionary<string, Contract> symbolAndExchangeToContract = new();
 
-            DataFeed = new DataManager(_client, symbolAndExchangeToContract, _textMsgQueue, _baseMsgQueue);
+            DataFeed = new DataManager(_client, symbolAndExchangeToContract, _textMsgQueue);
             OrderFeed = new OrdersManager(_client, symbolAndExchangeToContract, _textMsgQueue);
         }
 
@@ -56,9 +55,6 @@ namespace BrokerFacadeIB
         {
             _textMsgQueue?.CompleteAdding();
             _textMsgQueue?.Dispose();
-
-            _baseMsgQueue?.CompleteAdding();
-            _baseMsgQueue?.Dispose();
         }
 
         public void PlaceRequest(List<(string, string)> contractCodesAndExchanges,
@@ -70,21 +66,11 @@ namespace BrokerFacadeIB
 
         public StateObject GetState(DateTime currentUtc)
         {
-            var cnt = _baseMsgQueue.Count;
-            var consumed = 0;
-            List<BaseMessage> bmList = new();
-            if (cnt > 0)
-                foreach (var bm in _baseMsgQueue.GetConsumingEnumerable())
-                {
-                    bmList.Add(bm);
-                    if (++consumed == cnt) break;
-                }
-
-            cnt = _textMsgQueue.Count;
+            var cnt = _textMsgQueue.Count;
             List<Tuple<string, string>> tmList = new ();
             if (cnt > 0)
             {
-                consumed = 0;
+                var consumed = 0;
                 foreach (var t in _textMsgQueue.GetConsumingEnumerable())
                 {
                     tmList.Add(t);
@@ -95,7 +81,7 @@ namespace BrokerFacadeIB
             var (tickInfos, contractInfos, barUpdates) = DataFeed.GetState();
             var orderReports = OrderFeed.GetState();
 
-            return new StateObject(currentUtc,tickInfos,contractInfos,barUpdates,bmList, orderReports,tmList);
+            return new StateObject(currentUtc,tickInfos,contractInfos,barUpdates,orderReports,tmList);
         }
 
         public bool IsConnectionEstablished
@@ -119,7 +105,7 @@ namespace BrokerFacadeIB
             IsStarted = true;
 
             string err = null;
-            var suceeded = false;
+            var succeeded = false;
             CancellationTokenSource cts = new ();
             var token = cts.Token;
             lcts = new CancellationTokenSource();
@@ -151,7 +137,7 @@ namespace BrokerFacadeIB
                     }) {IsBackground = true};
                     _listenerThread.Start();
 
-                    suceeded = true;
+                    succeeded = true;
                 }
                 catch (Exception exception)
                 {
@@ -164,7 +150,7 @@ namespace BrokerFacadeIB
             thr.Start();
             thr.Join(10000);
 
-            if (suceeded)
+            if (succeeded)
             {
                 cts?.Dispose();
                 AddMessage("INFO","StartClient passed successfully");
@@ -244,11 +230,9 @@ namespace BrokerFacadeIB
                 case 1101: // Connectivity between IB and TWS has been restored- data lost.
                     DataFeed.ClearState();
                     OnConnectionEstablished();
-                    SendIsReady();
                     break;
                 case 1102: // Connectivity between IB and TWS has been restored- data maintained.
                     OnConnectionEstablished();
-                    SendIsReady();
                     break;
                 case 1300: //Unexpected case. The port number in the TWS/IBG settings has been changed during an active API connection.
                     AddMessage("CLIENT",str);
@@ -269,32 +253,18 @@ namespace BrokerFacadeIB
             AddMessage("INFO","ConnectionClosed");
         }
 
-
+        private string _conn_deconn_time;
         private void OnConnectionEstablished()
         {
             IsConnectionEstablished = true;
-
-            _baseMsgQueue.Add(BrokerConnectionStatus.MakeConnected(1, false)); // trade session is connected
-            _baseMsgQueue.Add(BrokerConnectionStatus.MakeConnected(1, true)); // quote session is connected
-
-            // is ready message will be sent when received a market data farm msg 
-            _baseMsgQueue.Add(new SessionReadiness(1, true, true));            // quote session is ready
-            _baseMsgQueue.Add(new SessionReadiness(1, false, true));            // trade session is ready
+            _conn_deconn_time = DateTime.UtcNow.ToString("yyyyMMdd:HHmmss");
+            _textMsgQueue.Add(new Tuple<string, string>("ConnectionStatus",$"Connected at {_conn_deconn_time}"));
         }
-
-        private void SendIsReady()
-        {
-            _baseMsgQueue.Add(new SessionReadiness(1, true, true));            // quote session is ready
-            _baseMsgQueue.Add(new SessionReadiness(1, false, true));            // trade session is ready
-        }
-
         private void SendDisconnectionMessages(SessionConnectionStatus disconnectionReason, string disconnectionDetails)
         {
-            _baseMsgQueue.Add(BrokerConnectionStatus.MakeDisconnected(1, false, disconnectionReason, disconnectionDetails));
-            _baseMsgQueue.Add(BrokerConnectionStatus.MakeDisconnected(1, true, disconnectionReason, disconnectionDetails));
-
-            _baseMsgQueue.Add(new SessionReadiness(1, true, false));            // quote session is ready
-            _baseMsgQueue.Add(new SessionReadiness(1, false, false));            // trade session is ready
+            //_baseMsgQueue.Add(BrokerConnectionStatus.MakeDisconnected(1, false, disconnectionReason, disconnectionDetails));
+            _textMsgQueue.Add(new Tuple<string, string>("ConnectionStatus", 
+                $"Disconnected at {DateTime.UtcNow:yyyyMMdd:HHmmss} by reason {disconnectionReason}. Details: {disconnectionDetails}"));
         }
         private void Disconnection(SessionConnectionStatus disconnectionReason, string disconnectionDetails)
         {
@@ -315,6 +285,7 @@ namespace BrokerFacadeIB
             }
             IsStarted = false;
             IsConnectionEstablished = false;
+            _conn_deconn_time = DateTime.UtcNow.ToString("yyyyMMdd:HHmmss");
 
             _anyNotification_received = false;
             _farmConnectionNtf_restWaitSeconds = 0;
@@ -345,7 +316,6 @@ namespace BrokerFacadeIB
                     if (_anyNotification_received)
                     {
                         AddMessage("INFO","Farm connection notification received. Set is ready");
-                        SendIsReady();
                         _farmConnectionNtf_restWaitSeconds = 0;
                     }
                     else if (--_farmConnectionNtf_restWaitSeconds == 0)

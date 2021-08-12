@@ -1,17 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Dynamic;
-using System.Linq;
-using System.Runtime.CompilerServices;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace CoreTypes
+﻿namespace CoreTypes
 {
     public class ErrorCollector
     {
         public int MaxErrorsPerDay { get; }
         private int _errors;
+
+        public bool ForgetErrors = false;
 
         public ErrorCollector(int maxErrorsPerDay)
         {
@@ -36,5 +30,7 @@ namespace CoreTypes
         {
             _errors = 0;
         }
+
+        public int Errors => _errors;
     }
 }

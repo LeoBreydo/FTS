@@ -5,7 +5,6 @@ using System.Collections.Generic;
 using System.Linq;
 using CoreTypes;
 using IBApi;
-using Messages;
 
 namespace BrokerFacadeIB
 {
@@ -21,7 +20,6 @@ namespace BrokerFacadeIB
         private readonly BlockingCollection<ContractDetails> _contractQueue = new();
         private readonly BlockingCollection<Bar5s> _barsQueue = new();
         private readonly BlockingCollection<Tuple<string, string>> _textMessageQueue;
-        private readonly BlockingCollection<BaseMessage> _baseMessageQueue;
 
         private void AddMessage(string tag, string message)
         {
@@ -33,12 +31,10 @@ namespace BrokerFacadeIB
 
         public DataManager(IBClient client, 
             Dictionary<string, Contract> symbolAndExchangeToContract,
-            BlockingCollection<Tuple<string, string>> textMessageQueue,
-            BlockingCollection<BaseMessage> baseMessageQueue)
+            BlockingCollection<Tuple<string, string>> textMessageQueue)
         {
             _client = client;
             _textMessageQueue = textMessageQueue;
-            _baseMessageQueue = baseMessageQueue;
             _symbolAndExchangeToContract = symbolAndExchangeToContract;
             _currentTickerId = START_TICKER_ID;
             _client.ContractDetails += _client_ContractDetails;
@@ -150,6 +146,7 @@ namespace BrokerFacadeIB
         }
         private void _client_TickPrice(TickPriceMessage tickPrice)
         {
+            //TODO uncomment next string when got a normal connection
             //if (tickPrice.Field > 4) return;
             if (!_registry.ContainsKey(tickPrice.RequestId)) return;
             var symbolExchange = _registry[tickPrice.RequestId].symbolExchange;
@@ -157,6 +154,7 @@ namespace BrokerFacadeIB
         }
         private void _client_TickSize(TickSizeMessage tickSize)
         {
+            //TODO uncomment next string when got a normal connection
             //if (tickSize.Field > 5) return;
             if (!_registry.ContainsKey(tickSize.RequestId)) return;
             string symbolExchange = _registry[tickSize.RequestId].symbolExchange;
@@ -201,32 +199,25 @@ namespace BrokerFacadeIB
         {
             lock (_lock)
             {
-                var cntr = _symbolAndExchangeToContract.ContainsKey(symbolExchange)
+                var contract = _symbolAndExchangeToContract.ContainsKey(symbolExchange)
                     ? _symbolAndExchangeToContract[symbolExchange]
                     : null;
-                if (cntr == null)
+                if (contract == null)
                 {
                     AddMessage("WARNING", 
-                        $"Invalid contract info used in subscribtion request ({symbolExchange})");
+                        $"Invalid contract info used in subscription request ({symbolExchange})");
                     return;
                 }
 
-                // if (!_client.ConnectionEstablished)
-                // {
-                //     AddMessage("DEBUG",
-                //         $"SubscriptionRequest to {cntr.LocalSymbol} ignored, connection to IB is not established");
-                //     return;
-                // }
-
                 var tickerId = GetNextTickerId();
-                _registry.Add(tickerId,(symbolExchange, cntr.LocalSymbol));
+                _registry.Add(tickerId,(symbolExchange, contract.LocalSymbol));
 
                 _client.ClientSocket.reqMarketDataType(3);
-                _client.ClientSocket.reqMktData(tickerId, cntr, string.Empty, false, false, null);
+                _client.ClientSocket.reqMktData(tickerId, contract, string.Empty, false, false, null);
                 tickerId = GetNextTickerId();
-                _5sBars.Add(tickerId, (symbolExchange, cntr.LocalSymbol));
+                _5sBars.Add(tickerId, (symbolExchange, contract.LocalSymbol));
                 _client.ClientSocket.reqMarketDataType(3);
-                _client.ClientSocket.reqRealTimeBars(tickerId, cntr, 5, "TRADES", true, null);
+                _client.ClientSocket.reqRealTimeBars(tickerId, contract, 5, "TRADES", true, null);
             }
         }
 
@@ -237,9 +228,7 @@ namespace BrokerFacadeIB
                 if (!_registry.ContainsKey(oid)) return;
                 var symbolExchange = _registry[oid].symbolExchange;
                 AddMessage("ERROR",
-                    $"Subsription to IB marketCode {symbolExchange} failed, ErrorCode={errorCode}, Msg={str}");
-                _baseMessageQueue.Add(new DataFeed_SubscriptionRejection(
-                    1, symbolExchange, 0, $"ErrorCode={errorCode}, Msg={str}"));
+                    $"Subscription to IB marketCode {symbolExchange} failed, ErrorCode={errorCode}, Msg={str}");
             }
         }
 
@@ -259,14 +248,14 @@ namespace BrokerFacadeIB
                 _client.ClientSocket.cancelMktData(ticker);
 
 
-                var tlst = new List<int>();
+                var tickList = new List<int>();
                 var foundSoFar = 0;
                 foreach (var kvp in _5sBars.Where(kvp => kvp.Value.contractCode == contractCode))
                 {
-                    tlst.Add(kvp.Key);
+                    tickList.Add(kvp.Key);
                     if (++foundSoFar == 3) break;
                 }
-                foreach (var t in tlst)
+                foreach (var t in tickList)
                 {
                     _5sBars.Remove(t);
                     _client.ClientSocket.cancelRealTimeBars(t);

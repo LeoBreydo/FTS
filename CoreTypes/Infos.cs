@@ -22,7 +22,7 @@ namespace CoreTypes
         public string Exchange { get; set; }
         public string LocalSymbol { get; }
         public DateTime ContractMonth { get; }
-        public string TimeZoneId { get; }
+        public string TimeZoneId { get; set; }
         public DateTime StartLiquidHours { get; set; }
         public DateTime EndLiquidHours { get; set; }
         public DateTime ExpirationDate { get; }

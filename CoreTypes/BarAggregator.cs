@@ -58,6 +58,9 @@ namespace CoreTypes
         public static Bar operator +(Bar current, Bar5s next)
             => new Bar(current.O, Math.Max(current.H, next.High), Math.Min(current.L, next.Low),
                 next.Close, current.Start, next.BarOpenTime.AddSeconds(5));
+
+        public string AsString(string symbolExchange, bool isNewContract) => 
+            $"SymbolExchange: {symbolExchange}, O: {O}, H: {H}, L: {L}, C: {C}, Start: {Start:yyyyMMdd:HHmmss}, End: {End:yyyyMMdd:HHmmss}, NewContract: {isNewContract}";
     }
     public class BarAggregator
     {
@@ -65,23 +68,23 @@ namespace CoreTypes
         private readonly XSecondsAggregationRules _rule;
         public Bar Current { get; private set; }
 
-        public string MarketCode { get; }
+        public string SymbolExchange { get; }
         public string ContractCode { get; private set; }
 
         private bool _newContract = false;
 
-        public BarAggregator(XSecondsAggregationRules rule, string marketCode, int gapInMinutes = int.MaxValue)
+        public BarAggregator(XSecondsAggregationRules rule, string symbolExchange, int gapInMinutes = int.MaxValue)
         {
             _gapInMinutes = gapInMinutes < 1 ? 1 : gapInMinutes;
             _rule = rule ?? throw new Exception("rule is null");
-            MarketCode = marketCode;
+            SymbolExchange = symbolExchange;
             ContractCode = string.Empty;
             Current = null;
         }
 
         /// <summary>
         /// returns aggregated bar (if there is aggregating bar and it must be finished at current currentTime)
-        /// + MarketCode + isNewContract
+        /// + SymbolExchange + isNewContract
         /// </summary>
         /// <param name="utcNow">current time</param>
         /// <returns>aggregated bar or null</returns>
@@ -95,14 +98,14 @@ namespace CoreTypes
                 Current = null;
                 var flag = _newContract;
                 _newContract = false;
-                return new Tuple<Bar, string, bool>(completed, MarketCode, flag);
+                return new Tuple<Bar, string, bool>(completed, SymbolExchange, flag);
             }
             return null;
         }
 
         /// <summary>
         /// returns aggregated bar (if there is aggregating bar)
-        /// + MarketCode + isNewContract
+        /// + SymbolExchange + isNewContract
         /// </summary>
         /// <param name="utcNow">current time</param>
         /// <returns>aggregated bar or null</returns>
@@ -116,25 +119,25 @@ namespace CoreTypes
                 Current = null;
                 var flag = _newContract;
                 _newContract = false;
-                return new Tuple<Bar, string, bool>(completed, MarketCode, flag);
+                return new Tuple<Bar, string, bool>(completed, SymbolExchange, flag);
             }
         }
         /// <summary>
         /// returns aggregated bar if it will be finished by aggregating rules
-        /// + MarketCode + isNewContract
+        /// + SymbolExchange + isNewContract
         /// </summary>
         /// <param name="bar">new five-sec bar</param>
         /// <returns>aggregated bar or null</returns>
         public Tuple<Bar,string, bool> ProcessBar(Bar5s bar, DateTime utcNow)
         {
-            if (MarketCode != bar.Symbol) return null;
+            if (SymbolExchange != bar.SymbolExchange) return null;
             if (ContractCode != bar.ContractCode)
             {
                 ContractCode = bar.ContractCode;
                 _newContract = true;
                 var completed = Current;
                 Current = new Bar(bar);
-                return completed == null ? null : new Tuple<Bar, string, bool>(completed, MarketCode, false);
+                return completed == null ? null : new Tuple<Bar, string, bool>(completed, SymbolExchange, false);
             }
             if (Current == null)
             {
@@ -147,7 +150,7 @@ namespace CoreTypes
                     Current = null;
                     var flag = _newContract;
                     _newContract = false;
-                    return new Tuple<Bar, string, bool>(completed, MarketCode, flag);
+                    return new Tuple<Bar, string, bool>(completed, SymbolExchange, flag);
                 }
                 return null;
             }
@@ -160,7 +163,7 @@ namespace CoreTypes
                 Current = null;
                 var flag = _newContract;
                 _newContract = false;
-                return new Tuple<Bar, string, bool>(completed, MarketCode, flag);
+                return new Tuple<Bar, string, bool>(completed, SymbolExchange, flag);
             }
             return null;
         }

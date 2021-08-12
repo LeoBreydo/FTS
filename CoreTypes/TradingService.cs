@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using Messages;
 
 namespace CoreTypes
 {
@@ -12,6 +11,7 @@ namespace CoreTypes
         #region structure
         // it seems that sorted list is faster than dictionary for static collections
         public SortedList<string, ExchangeTrader> Exchanges { get; } = new();
+
         public SortedList<string, CurrencyPosition> Positions = new();
         public readonly SortedList<int, ICommandReceiver> CommandReceivers = new();
         // key: marketCode+exchange
@@ -47,6 +47,11 @@ namespace CoreTypes
             }
         }
 
+        private List<string> GetTicksInfo(DateTime utcNow) => 
+            _priceProviderMap.Select(kvp => kvp.Value.AsString(utcNow, kvp.Key)).ToList();
+        private List<string> GetBarsInfo(List<Tuple<Bar, string, bool>> bars) => 
+            bars.Select(t => t.Item1.AsString(t.Item2,t.Item3)).ToList();
+
         private void RegisterStrategyTrader(string exchangeName, string marketName, StrategyTrader st)
         {
             if (Exchanges.ContainsKey(exchangeName))
@@ -65,8 +70,10 @@ namespace CoreTypes
 
         private readonly ServiceRestrictionsManager _restrictionManager = new();
         private TradingRestriction _currentRestriction;
+        public ServiceRestrictionsManager RestrictionManager => _restrictionManager;
 
         private readonly ErrorCollector _errorCollector;
+        public ErrorCollector Collector => _errorCollector;
         private DateTime _lastDayStart = DateTime.UtcNow.AddDays(-1);
 
         public TradingService(TradingConfiguration cfg)
@@ -77,34 +84,38 @@ namespace CoreTypes
         }
 
 
-        public (List<(string, string)> subscriptions, List<MarketOrderDescription> orders, TradingServiceState state)
-            ProcessCurrentState(StateObject so, List<ICommand> clCmdList, List<ICommand> schCmdList, bool forgetErrors=false)
+        public (List<(string, string)> subscriptions, List<MarketOrderDescription> orders, TradingServiceState state,
+            List<string> ticksInfo, List<string> barsInfo, List<string> tradesInfo, List<(string,string,string)> errors)
+            ProcessCurrentState(StateObject so, List<ICommand> clCmdList, List<ICommand> schCmdList)
         {
+            _errorCollector.ForgetErrors = false;
             if (clCmdList?.Count > 0) ApplyCommands(clCmdList);
             if (schCmdList?.Count > 0) ApplyCommands(schCmdList);
             ApplyNewTicks(so);
             var newBars = MakeNewOneMinuteBars(so);
             // TODO inject new bars (and ticks?) to indicator container
             var newTrades = ApplyOrderReports(so, out var errorMessages, out int errorsNbr);
-            UpdateErrorCollector(so, forgetErrors, errorsNbr);
+            UpdateErrorCollector(so, errorsNbr);
             UpdateProfitLossInfos();
             var subscriptionList = ProcessContractInfos(so);
             UpdateParentRestrictions();
-            // TODO realize GetCurrentState(so) - now it is just a stub
-            TradingServiceState currentState = GetCurrentState(so);
-            // TODO log all information - ticks, bars, trades, reports, errorMessages etc
-            // TODO push errorMessages to client
             var ordersToPost = GenerateOrders(so.CurrentUtcTime, newTrades);
+
+            var currentState = GetCurrentState(errorMessages, so);
             return (
                 subscriptions: subscriptionList,
                 orders: ordersToPost,
-                state: currentState
+                state: currentState,
+                ticksInfo: GetTicksInfo(so.CurrentUtcTime),
+                barsInfo: GetBarsInfo(newBars),
+                tradesInfo: newTrades,
+                errors: errorMessages
                     );
         }
 
         #region privates
 
-        private void UpdateErrorCollector(StateObject so, bool forgetErrors, int errorsNbr)
+        private void UpdateErrorCollector(StateObject so, int errorsNbr)
         {
             if ((so.CurrentUtcTime - _lastDayStart).TotalDays >= 1)
             {
@@ -113,15 +124,25 @@ namespace CoreTypes
             }
 
             _errorCollector.ApplyErrors(errorsNbr);
-            if (forgetErrors) _errorCollector.Reset();
+            if (_errorCollector.ForgetErrors)
+            {
+                _errorCollector.Reset();
+                _errorCollector.ForgetErrors = false;
+            }
             _restrictionManager.SetErrorsNbrRestriction(_errorCollector.IsStopped
                 ? TradingRestriction.HardStop
                 : TradingRestriction.NoRestrictions);
         }
-        private TradingServiceState GetCurrentState(StateObject so) => new TradingServiceState();
-        private List<MarketOrderDescription> GenerateOrders(DateTime utcNow, List<Trade> newTrades)
+        private TradingServiceState GetCurrentState(List<(string market, string exchange, string txt)> errorMessages, StateObject so)
         {
-            List<(MarketTrader, MarketOrderDescription, List<Trade>)> ogs = 
+            var msgToClient = so.TextMessageList;
+            msgToClient.AddRange(errorMessages.Select(em => new Tuple<string,string>("Error",em.txt)));
+            return new TradingServiceState(msgToClient, errorMessages, this);
+        }
+
+        private List<MarketOrderDescription> GenerateOrders(DateTime utcNow, List<string> newTrades)
+        {
+            List<(MarketTrader, MarketOrderDescription, List<string>)> ogs = 
                 (from et in Exchanges.Values 
                     from mt in et.Markets.Values 
                     select mt.GenerateOrders(utcNow))
@@ -139,46 +160,21 @@ namespace CoreTypes
         {
             foreach (var kvp in Positions) kvp.Value.Update();
         }
-        private List<Trade> ApplyOrderReports(StateObject so, out List<string> errorMessages, out int errorsNbr)
+        private List<string> ApplyOrderReports(StateObject so, out List<(string market, string exchange, string txt)> errorMessages, out int errorsNbr)
         {
-            static string ReportUnknownExecution(OrderReportBase report)
+            static string ReportUnknownExecution(OrderStateMessage report)
             {
-                switch (report.MessageNumber)
+                switch (report.MyType)
                 {
-                    case (int)MessageNumbers.OrderPosting:
+                    case OrderStateMessageType.Cancel:
                         {
-                            var r = ((OrderPosting)report);
-                            return $"OrderPosting report for unknown order detected for {r.Symbol} (order id is {r.OrderID})";
+                            var r = ((OrderCancelMessage)report);
+                            return $"Rejection report for unknown order detected for {r.OrderId} by reason: {r.CancelReason}";
                         }
-                    case (int)MessageNumbers.AcknowledgementReport:
+                    case OrderStateMessageType.Execution:
                         {
-                            var r = ((AcknowledgementReport)report);
-                            return $"Acknowledgement report for unknown order detected for {r.Symbol} (order id is {r.OrderID})";
-                        }
-                    case (int)MessageNumbers.RejectionReport:
-                        {
-                            var r = ((RejectionReport)report);
-                            return $"Rejection report for unknown order detected for {r.Symbol} (order id is {r.OrderID})";
-                        }
-                    case (int)MessageNumbers.OrderPostRejection:
-                        {
-                            var r = ((OrderPostRejection)report);
-                            return $"OrderPostRejection report for unknown order detected (reason is {r.RejectionReason})";
-                        }
-                    case (int)MessageNumbers.OrderPosted:
-                        {
-                            var r = ((OrderPosted)report);
-                            return $"OrderPosted report for unknown order detected for {r.Symbol} (order id is {r.OrderID})";
-                        }
-                    case (int)MessageNumbers.OrderStoppedReport:
-                        {
-                            var r = ((OrderStoppedReport)report);
-                            return $"OrderStopped report for unknown order detected for {r.Symbol} (order id is {r.OrderID})";
-                        }
-                    case (int)MessageNumbers.OrderFillReport:
-                        {
-                            var r = ((OrderFillReport)report);
-                            return $"OrderFill report for unknown order detected for {r.Symbol} (order id is {r.OrderID})";
+                            var r = ((OrderExecutionMessage)report);
+                            return $"OrderFill report for unknown order detected for {r.Symbol} at {r.Exchange} (order id is {r.OrderId})";
                         }
                     default: return "OrderReport for unknown order detected";
                 }
@@ -186,26 +182,27 @@ namespace CoreTypes
 
             errorsNbr = 0;
             errorMessages = new();
-            if (so.OrderReportBaseList.Count == 0) return null;
-            List<Trade> newTrades = new();
+            if (so.OrderStateMessageList.Count == 0) return null;
+            List<string> newTrades = new();
             
-            foreach (var report in so.OrderReportBaseList)
+            foreach (var report in so.OrderStateMessageList)
             {
-                if (!_reportsRoutingMap.ContainsKey(report.ClOrdID))
+                if (!_reportsRoutingMap.ContainsKey(report.ClOrderId))
                 {
-                    errorMessages.Add(ReportUnknownExecution(report));
+                    errorMessages.Add(("UNK","UNK",ReportUnknownExecution(report)));
                     errorsNbr++;
                 }
                 else
                 {
-                    var (tradeList, isOrderFinished) = _reportsRoutingMap[report.ClOrdID].ApplyOrderReport(so.CurrentUtcTime, 
+                    var mt = _reportsRoutingMap[report.ClOrderId];
+                    var (tradeList, isOrderFinished) = mt.ApplyOrderReport(so.CurrentUtcTime, 
                         report, out var errorMessage);
                     if (errorMessage != null)
                     {
-                        errorMessages.Add(errorMessage);
+                        errorMessages.Add((mt.MarketCode,mt.Exchange,errorMessage));
                         errorsNbr++;
                     }
-                    if (isOrderFinished) _reportsRoutingMap.Remove(report.ClOrdID);
+                    if (isOrderFinished) _reportsRoutingMap.Remove(report.ClOrderId);
                     if (tradeList?.Count > 0) newTrades.AddRange(tradeList);
                 }
             }
@@ -213,18 +210,24 @@ namespace CoreTypes
             foreach (var cm in _contactManagers.Values)
             {
                 var msgList = cm.ApplyCurrentTime(so.CurrentUtcTime, out var idList);
-                foreach (var id in idList.Where(id => _reportsRoutingMap.ContainsKey(id)))
+                var idx = 0;
+                foreach (var id in idList)
                 {
-                    _reportsRoutingMap.Remove(id);
-                    errorsNbr++;
+                    if (_reportsRoutingMap.ContainsKey(id))
+                    {
+                        var mt = _reportsRoutingMap[id];
+                        errorMessages.Add((mt.MarketCode,mt.Exchange,msgList[idx]));
+                        _reportsRoutingMap.Remove(id);
+                        errorsNbr++;
+                    }
+                    ++idx;
                 }
-                if(msgList.Count > 0) errorMessages.AddRange(msgList);
             }
             return newTrades;
         }
-        private List<(string SymbolDocumentInfo, string exchange)> ProcessContractInfos(StateObject so)
+        private List<(string symbol, string exchange)> ProcessContractInfos(StateObject so)
         {
-            List<(string marketCode, string exchange)> subscriptionList = 
+            List<(string marketCode, string exchange, string error)> subscriptionList = 
                 (from ci in so.ContractInfoList 
                     let key = ci.MarketName + ci.Exchange 
                     where _contactManagers.ContainsKey(key) 
@@ -232,7 +235,11 @@ namespace CoreTypes
                     into res
                     select res).ToList();
             subscriptionList.AddRange(_contactManagers.Values.Select(cm => cm.ProcessContractInfo(null, so.CurrentUtcTime)));
-            return subscriptionList.Where(t=>t.marketCode != string.Empty).ToList();
+            foreach (var (_,_,error) in subscriptionList.Where(t => t.error != string.Empty))
+                so.TextMessageList.Add(new Tuple<string, string>("SubscriptionError", error));
+            return subscriptionList.Where(t=>t.marketCode != string.Empty && t.error == string.Empty)
+                .Select(t=> (t.marketCode, t.exchange))
+                .ToList();
         }
         private List<Tuple<Bar, string, bool>> MakeNewOneMinuteBars(StateObject so)
         {
@@ -266,6 +273,8 @@ namespace CoreTypes
                 case CommandSource.User:
                     if(command is RestrictionCommand userCommand)
                         _restrictionManager.SetUserRestriction(userCommand.Restriction);
+                    else if (command is ErrorsForgetCommand errorsCommand)
+                        _errorCollector.ForgetErrors = true;
                     break;
                 case CommandSource.Scheduler:
                     if (command is RestrictionCommand schedulerCommand)

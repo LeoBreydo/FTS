@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace CommonStructures
+namespace CoreTypes
 {
     /// <summary>
     /// Helper class to convert DateTime values to string and back

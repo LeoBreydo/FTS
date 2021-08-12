@@ -1,6 +1,4 @@
-﻿using CommonStructures;
-
-namespace Messages
+﻿namespace Messages
 {
     public class MarketFilterStates : BaseMessage
     {

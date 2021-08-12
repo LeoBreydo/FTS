@@ -34,14 +34,16 @@ namespace CoreTypes
 
     public class ExchangePosition
     {
+        public ExchangeTrader Owner;
         public List<MarketPosition> MarketPositions { get; private set; } = new();
 
         public decimal UnrealizedResult { get; private set; } = 0;
         public decimal RealizedResult { get; private set; } = 0;
         public int DealNbr { get; private set; } = 0;
 
-        public ExchangePosition()
+        public ExchangePosition(ExchangeTrader owner)
         {
+            Owner = owner;
         }
 
         public void Update()
@@ -177,7 +179,7 @@ namespace CoreTypes
             _refQuote = settlementPrice;
         }
 
-        public List<Trade> ProcessNewDeals(IEnumerable<(Execution, int)> deals)
+        public List<string> ProcessNewDeals(IEnumerable<(Execution, int)> deals)
         {
             // Call condition : toReduce != 0 && reduceBy != 0
             static (int, int)? ReduceDeals(int toReduce, int reduceBy)
@@ -188,7 +190,7 @@ namespace CoreTypes
                 return res == 0 ? (0, 0) : Sign(res) == Sign(toReduce) ? (res, 0) : (0, res);
             }
 
-            List<Trade> trades = new();
+            List<string> trades = new();
             int io = 0, total = _openDeals.Count;
             foreach (var (e, s) in deals)
             {
@@ -227,7 +229,7 @@ namespace CoreTypes
                             {
                                 case 0 when newDealRemainder == 0:
                                     // opened deal and new deal are reduced the both
-                                    trades.Add(new Trade(ee, e, ss, StrategyName));
+                                    trades.Add(new Trade(ee, e, ss, StrategyName).ToString());
                                     RealizedResult += _bpv * (p == -1
                                         ? (e.Price - ee.Price) * ss
                                         : (e.Price - p) * ss);
@@ -235,7 +237,7 @@ namespace CoreTypes
                                     break;
                                 case 0:
                                     // opened deal is reduced
-                                    trades.Add(new Trade(ee, e, ss, StrategyName));
+                                    trades.Add(new Trade(ee, e, ss, StrategyName).ToString());
                                     RealizedResult += _bpv * (p == -1
                                         ? (e.Price - ee.Price) * ss
                                         : (e.Price - p) * ss);
@@ -243,7 +245,7 @@ namespace CoreTypes
                                     break;
                                 default:
                                     // new deal is reduced
-                                    trades.Add(new Trade(ee, e, cnt, StrategyName));
+                                    trades.Add(new Trade(ee, e, cnt, StrategyName).ToString());
                                     RealizedResult += _bpv * (p == -1
                                         ? (e.Price - ee.Price) * cnt
                                         : (e.Price - p) * cnt);

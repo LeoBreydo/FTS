@@ -38,6 +38,13 @@ namespace CoreTypes
         }
     }
 
+    public class ErrorsForgetCommand : ICommand
+    {
+        public CommandDestination Destination { get; } = CommandDestination.Service;
+        public CommandSource Source { get; } = CommandSource.User;
+        public int DestinationId { get; } = 0;
+    }
+
     public class OrderRepeatCommand : ICommand
     {
         public CommandDestination Destination { get; } = CommandDestination.Strategy;
@@ -93,6 +100,20 @@ namespace CoreTypes
         public static int ToInt(this CommandSource r)
         {
             return (int)r;
+        }
+        public static string AsString(this CommandSource r)
+        {
+            return r switch
+            {
+                CommandSource.User => "User",
+                CommandSource.Scheduler => "Scheduler",
+                CommandSource.CriticalLoss => "CriticalLoss",
+                CommandSource.Parent => "Parent",
+                CommandSource.EndOfContract => "EndOfContract",
+                CommandSource.EndOfSession => "EndOfSession",
+                CommandSource.Error => "Error",
+                _ => "ErrorsNbr"
+            };
         }
     }
 

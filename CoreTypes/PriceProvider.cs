@@ -41,5 +41,10 @@ namespace CoreTypes
         }
 
         public (decimal bid, decimal ask, decimal last) LastPrices => (Bid, Ask, LastPrice);
+
+        public string AsString(DateTime utcNow, string symbolExchange)
+        {
+            return $"SymbolExchange: {symbolExchange}, Time: {utcNow:yyyyMMdd:HHmmss}, Bid: {Bid}, Ask: {Ask}, Last: {LastPrice}, BidSize: {BidSize}, AskSize: {AskSize}, LastSize: {LastSize}";
+        }
     }
 }

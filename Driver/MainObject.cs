@@ -1,9 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using BrokerFacadeIB;
 using CoreTypes;
 
@@ -16,6 +11,7 @@ namespace Driver
         public TradingService TService { get; }
         public ClientCommunicationFacade Client {get;}
         public Scheduler Scheduler { get; }  
+        public InfoLogger Logger { get; }
         
         public MainObject()
         {
@@ -29,6 +25,7 @@ namespace Driver
             TService = new TradingService(Configuration);
             Client = new ClientCommunicationFacade();
             Scheduler = new Scheduler();
+            Logger = new(15, "./");
         }
 
         private TradingConfiguration ReadAndVerifyConfiguration(string path)
@@ -43,17 +40,19 @@ namespace Driver
 
             var clientCmdList = Client.GetCommands();
             var schedulerCmdList = Scheduler.GetCommands();
-            var msgToClient = so.TextMessageList.Where(t => t.Item1 == "CLIENT")
-                .Select(t => t.Item2).ToList();
-            Console.WriteLine(so.CurrentUtcTime.Second);
-            if(so.BarUpdateList.Count != 0) Console.WriteLine("!");
-            foreach (var ci in so.ContractInfoList) Console.WriteLine(ci.ToString());
 
-            var (subscriptions, orders, state) = TService.ProcessCurrentState(so, clientCmdList, schedulerCmdList);
+            var (subscriptions, orders, state, ticksInfo, barsInfo, tradesInfo, errors) = TService.ProcessCurrentState(so, clientCmdList, schedulerCmdList);
             Facade.PlaceRequest(subscriptions, orders);
-            Client.PushInfo(msgToClient, state);
+            Client.PushInfo(state);
+            
+            Logger.PostToLog(so.CurrentUtcTime, ticksInfo, barsInfo, tradesInfo,
+                so.OrderStateMessageList, so.TextMessageList, errors);
         }
 
-        public void Stop() => Facade.Stop();
+        public void Stop()
+        {
+            Facade.Stop();
+            Logger.Flush();
+        } 
     }
 }

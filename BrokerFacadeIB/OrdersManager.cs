@@ -3,10 +3,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using CommonStructures;
 using CoreTypes;
 using IBApi;
-using Messages;
 
 
 namespace BrokerFacadeIB
@@ -20,7 +18,7 @@ namespace BrokerFacadeIB
 
         private readonly IBClient _client;
 
-        private readonly BlockingCollection<OrderReportBase> _orderReportQueue = new();
+        private readonly BlockingCollection<OrderStateMessage> _orderReportQueue = new();
         private readonly BlockingCollection<Tuple<string, string>> _textMessageQueue;
         private void AddMessage(string tag, string message) => 
             _textMessageQueue.Add(new Tuple<string, string>(tag, message));
@@ -70,12 +68,12 @@ namespace BrokerFacadeIB
             _client.ExecDetailsEnd += ProcessEndExecReports;
         }
 
-        public List<OrderReportBase> GetState()
+        public List<OrderStateMessage> GetState()
         {
             SecondPulse();
             var cnt = _orderReportQueue.Count;
             var consumed = 0;
-            List<OrderReportBase> oReports = new();
+            List<OrderStateMessage> oReports = new();
             if (cnt > 0)
                 foreach (var or in _orderReportQueue.GetConsumingEnumerable())
                 {
@@ -123,18 +121,10 @@ namespace BrokerFacadeIB
             int clOrdID = FindOrder(oid, out var oi) ? oi.ClOrderId : UNKNOWN_ClOrderID;
             switch (status)
             {
-                case "Submitted":
-                    //Indicates that your order has been accepted at the order destination and is working, thus, order accepted                    
-                    _orderReportQueue.Add(FillExecutionReport(new AcknowledgementReport(1, clOrdID), oid, status));
-                    break;
                 case "Cancelled":
-                    //This could occur unexpectedly when IB or the destination has rejected your order.
-                    _orderReportQueue.Add(FillExecutionReport(new RejectionReport(1, clOrdID), oid, status));
-                    break;
                 case "Inactive":
-                    //Order is invalid or triggered an error. It will not be executed.
-                    _orderReportQueue.Add(FillExecutionReport(new RejectionReport(1, clOrdID), oid, status));
-                    break;                
+                    _orderReportQueue.Add(new OrderCancelMessage(clOrdID, DateTime.UtcNow, oid, "Rejection: "+status));
+                    break;
             }
         }
         public void handle_Error(int oid, int errorCode, string str)
@@ -144,11 +134,8 @@ namespace BrokerFacadeIB
             // The IBApi.EWrapper.error event contains the originating request Id(or the orderId in case the error was raised when placing an order)...
             // During the tests it was detected that rejection report can be returned using this message with id:=orderId
 
-            if (FindOrder(oid, out OrderInfo orderInfo))
-                _orderReportQueue.Add(FillExecutionReport(new RejectionReport(1, orderInfo.ClOrderId)
-                {
-                    Text = $"errorCode={errorCode}; {str}"
-                }, oid, null));
+            if (FindOrder(oid, out var orderInfo))
+                _orderReportQueue.Add(new OrderCancelMessage(orderInfo.ClOrderId, DateTime.UtcNow, oid, $"errorCode={errorCode}; {str}"));
         }
         
         public void SecondPulse()
@@ -238,7 +225,8 @@ namespace BrokerFacadeIB
             for (var i = 0; i < waitCnt; ++i)
             {
                 var order = _waitingOrders.Dequeue();
-                _orderReportQueue.Add(new OrderPostRejection(1, order.ClOrdId, "Impossible to send order - no connection"));
+                _orderReportQueue.Add(
+                    new OrderCancelMessage(order.ClOrdId, DateTime.UtcNow, -1, "Impossible to send order - no connection"));
             }
         }
 
@@ -287,9 +275,9 @@ namespace BrokerFacadeIB
                 OrderType = "MKT",
                 TotalQuantity = qty,
             };
+            var orderId = _nextOrderId++;
             try
             {
-                var orderId = _nextOrderId++;
                 if (ExistsOrder(orderId))
                 {
                     // an emergency check, existing item will lead to exception and financial loss
@@ -297,28 +285,17 @@ namespace BrokerFacadeIB
                     while (ExistsOrder(orderId)) orderId = _nextOrderId++;
                     AddMessage("INFO","orderId corrected -> " + orderId);
                 }
-                _orderReportQueue.Add(new OrderPosting(1, clientOrderId,
-                    order.Symbol, action, qty, "MKT", 0)
-                {
-                    OrderID = orderId.ToString()
-                });
 
                 _activeOrders.Add(new OrderInfo(orderId, clientOrderId, _secondsCount, qty, order.Symbol, action));
                 _activeOrdersR = _activeOrders.ToArray();
 
                 _client.ClientSocket.placeOrder(orderId, contract, o);
                 ++_sentCount;
-
-                _orderReportQueue.Add(new OrderPosted(1, clientOrderId,
-                    order.Symbol, action, qty, "MKT", 0)
-                {
-                    OrderID = orderId.ToString()
-                });
-
             }
             catch (Exception exception)
             {
-                _orderReportQueue.Add(new OrderPostRejection(1, clientOrderId, "Exception:" + exception.Message));
+                _orderReportQueue.Add(
+                    new OrderCancelMessage(clientOrderId, DateTime.UtcNow, orderId, "Exception:" + exception.Message));
             }
         }
 
@@ -328,14 +305,6 @@ namespace BrokerFacadeIB
             ResetQueryMissedExecRep();
             _forceUpdateNextIdTime = true;
         }
-
-        private static BaseExecutionReport FillExecutionReport(BaseExecutionReport report, int oid, string status)
-        {                        
-            report.OrderID = ""+oid;                                                           
-            report.OrdStatus = status;  
-            report.TransactTime = DateTime.UtcNow;
-            return report;
-        }        
 
         private static string ExecToStr(ExecutionMessage msg)
         {
@@ -404,10 +373,7 @@ namespace BrokerFacadeIB
             var ordersToCancel = _activeOrdersR
                 .Where(oi => oi.CreationSecond <= _cancelMissedOrdersBeforeSecond && oi.LeaveQty > 0).ToArray();
             foreach (var oi in ordersToCancel)
-            {
-                _orderReportQueue.Add(FillExecutionReport(new OrderStoppedReport(1, oi.ClOrderId),
-                    oi.OrderId, "order lost"));
-            }
+                _orderReportQueue.Add(new OrderCancelMessage(oi.ClOrderId, DateTime.UtcNow, oi.OrderId, "Order lost"));
         }
 
         private void ProcessExecReport(ExecutionMessage msg, OrderInfo oi)
@@ -419,53 +385,29 @@ namespace BrokerFacadeIB
                     AddMessage("INFO","Ignore obsolete historical ExecReport: " + ExecToStr(msg));
                 else
                 {
-                    _orderReportQueue.Add(new OrderFillReport(new FillsItem
-                    {
-                        ClOrdId = UNKNOWN_ClOrderID,
-                        OrderId = msg.Execution.OrderId,
-                        BrokerID = 1,
-                        Symbol = msg.Contract.Symbol,
-                        ContractCode = msg.Contract.LocalSymbol,
-                        Exchange = msg.Contract.Exchange,
-                        OrderSide = msg.Execution.Side == "BOT" ? OrderSide.Buy : OrderSide.Sell,
-                        Qty = (long)msg.Execution.Shares,
-                        Price = msg.Execution.Price,
-                        TransactTime = msg.Execution.Time.ParseIBDateTime(),
-                        FillsReceivedTime = DateTime.UtcNow,
-                        ExecID = msg.Execution.ExecId,
-                        CumQty = (long)msg.Execution.CumQty
-                    }, false));
-
+                    _orderReportQueue.Add(new OrderExecutionMessage(UNKNOWN_ClOrderID, DateTime.UtcNow,
+                        msg.Execution.OrderId, msg.Execution.ExecId,
+                        msg.Contract.Symbol, msg.Contract.LocalSymbol, msg.Contract.Exchange,
+                        (int) msg.Execution.Shares * (msg.Execution.Side == "BOT" ? 1 : -1),
+                        (int) msg.Execution.CumQty, (decimal) msg.Execution.Price,
+                        msg.Execution.Time.ParseIBDateTime()));
                 }
                 return;
             }
-
             if (oi.ExecIds.Contains(msg.Execution.ExecId))
             {
                 AddMessage("INFO","Ignore duplicated ExecReport: " + ExecToStr(msg));
                 return;
             }
-
             oi.ExecIds.Add(msg.Execution.ExecId);
             var qty = (long)msg.Execution.Shares;
             oi.LeaveQty -= qty;
-            _orderReportQueue.Add(new OrderFillReport(new FillsItem
-            {
-                ClOrdId = oi.ClOrderId,
-                OrderId = msg.Execution.OrderId,
-                BrokerID = 1,
-                Symbol = msg.Contract.Symbol,
-                ContractCode = msg.Contract.LocalSymbol,
-                Exchange = msg.Contract.Exchange,
-                OrderSide = msg.Execution.Side == "BOT" ? OrderSide.Buy : OrderSide.Sell,
-                Qty = qty,
-                Price = msg.Execution.Price,
-                TransactTime = msg.Execution.Time.ParseIBDateTime(),
-                FillsReceivedTime = DateTime.UtcNow,
-                ExecID = msg.Execution.ExecId,
-                CumQty = (long)msg.Execution.CumQty
-            }, (int)msg.Execution.CumQty == oi.OrderQty, oi.LeaveQty));
+            _orderReportQueue.Add(new OrderExecutionMessage(oi.ClOrderId, DateTime.UtcNow,
+                msg.Execution.OrderId, msg.Execution.ExecId,
+                msg.Contract.Symbol, msg.Contract.LocalSymbol, msg.Contract.Exchange,
+                (int)msg.Execution.Shares * (msg.Execution.Side == "BOT" ? 1 : -1),
+                (int)msg.Execution.CumQty, (decimal)msg.Execution.Price,
+                msg.Execution.Time.ParseIBDateTime()));
         }
-
     }
 }

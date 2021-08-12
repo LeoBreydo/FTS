@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using Messages;
+using System.Linq;
 
 namespace CoreTypes
 {
@@ -15,19 +15,15 @@ namespace CoreTypes
 
         public void RegisterMarketTrader(MarketTrader mt)
         {
-            //_marketMap.Add(mt.InternalID,mt);
             Markets.Add(mt.MarketCode,mt);
             Position.RegisterMarketPosition(mt);
         }
 
-        public void RegisterStrategyTrader(StrategyTrader st)
-        {
-            //_strategyMap.Add(st.InternalID,st);
-        }
         #endregion // structure
 
         private TradingRestriction _currentRestriction;
         private readonly ExchangeRestrictionsManager _restrictionsManager = new();
+        public ExchangeRestrictionsManager RestrictionsManager => _restrictionsManager;
 
         public void ApplyCommand(ICommand command)
         {
@@ -50,7 +46,7 @@ namespace CoreTypes
             InternalID = internalId;
             Exchange = exchange;
             Currency = currency;
-            Position = new ExchangePosition();
+            Position = new ExchangePosition(this);
             _currentRestriction = _restrictionsManager.GetCurrentRestriction();
         }
     }
@@ -104,15 +100,15 @@ namespace CoreTypes
             _currentRestriction = RestrictionsManager.GetCurrentRestriction();
             ContractManager = new(this);
         }
-        public (MarketTrader, MarketOrderDescription order, List<Trade>) GenerateOrders(DateTime utcNow)
+        public (MarketTrader, MarketOrderDescription order, List<string>) GenerateOrders(DateTime utcNow)
         {
             return OrderGenerator.GenerateOrders(this, utcNow);
         }
-        public (List<Trade> tlist, bool isOrderFinished) ApplyOrderReport(DateTime utcTime, OrderReportBase report, out string errorMessage)
+        public (List<string> tlist, bool isOrderFinished) ApplyOrderReport(DateTime utcTime, OrderStateMessage report, out string errorMessage)
         {
             return OrderReportsProcessor.ApplyOrderReport(this, utcTime, report, out errorMessage);
         }
-        public static List<Trade> ApplyPartialVirtualFill(StrategyTrader s, decimal quote,
+        public static List<string> ApplyPartialVirtualFill(StrategyTrader s, decimal quote,
             DateTime utcNow, int virtuallyFilled, string clOrderId, int clBasketId)
         {
             var r =
@@ -122,7 +118,7 @@ namespace CoreTypes
             s.CurrentOperationAmount -= virtuallyFilled;
             return t;
         }
-        public static List<Trade> ApplyVirtualFill(StrategyTrader s, decimal quote, DateTime utcNow,
+        public static List<string> ApplyVirtualFill(StrategyTrader s, decimal quote, DateTime utcNow,
             string clOrderID, int clBasketID)
         {
             var r =
@@ -133,13 +129,15 @@ namespace CoreTypes
             return t;
         }
 
-        public static List<Trade> ApplyRealFill(StrategyTrader s, decimal quote, DateTime utcNow,
-            string clOrderID, int clBasketID, int amount)
+        public static List<string> ApplyRealFill(StrategyTrader s, OrderExecutionMessage report) => 
+            ApplyRealFill(s, report, report.SgnQty);
+
+        public static List<string> ApplyRealFill(StrategyTrader s, OrderExecutionMessage report, int amount)
         {
             var opAmountBefore = s.CurrentOperationAmount;
             var r =
                 new List<(Execution, int)>
-                    {(new Execution(clOrderID, clBasketID, utcNow, quote), amount)};
+                    {(new Execution(report.ExecId, report.OrderId, report.TransactTime, report.Price), amount)};
             var t = s.Position.ProcessNewDeals(r);
             if (opAmountBefore == 0) // no operation expected
             {
@@ -177,12 +175,9 @@ namespace CoreTypes
             {
                 if ((currentUtcTime - kvp.Value.Item2).TotalMinutes >= 3)
                 {
-                    foreach (var b in kvp.Value.Item1)
-                    {
-                        var s = StrategyMap[b.StrategyId];
+                    messages.Add($"order for market {MarketCode} at {Exchange} was cancelled by timeout");
+                    foreach (var s in kvp.Value.Item1.Select(b => StrategyMap[b.StrategyId]))
                         s.CurrentOperationAmount = 0;
-                        messages.Add($"order for strategy (id is {s.Id}) was cancelled by timeout");
-                    }
                     keysToRemove.Add(kvp.Key);
                 }
             }
@@ -204,11 +199,13 @@ namespace CoreTypes
         public StrategyPosition Position { get; private set; }
         public int CurrentOperationAmount { get; set; } = 0;
         public int ContractsNbr { get; set; } = 1;
+
         public int OffsetDealAmount = 0; // mandatory execution!!
 
         private Signal _lastSignal;
         private readonly StrategyRestrictionsManager _restrictionsManager = new();
         private TradingRestriction _currentRestriction;
+        public StrategyRestrictionsManager RestrictionsManager => _restrictionsManager;
 
         public StrategyTrader(int internalId, int id, StrategyPosition position, SignalService signalService)
         {
