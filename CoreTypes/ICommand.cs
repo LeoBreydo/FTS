@@ -25,7 +25,6 @@ namespace CoreTypes
             Restriction = restriction;
         }
     }
-
     public class OrderForgetCommand : ICommand
     {
         public CommandDestination Destination { get; } = CommandDestination.Strategy;
@@ -37,12 +36,17 @@ namespace CoreTypes
             DestinationId = destinationId;
         }
     }
-
     public class ErrorsForgetCommand : ICommand
     {
-        public CommandDestination Destination { get; } = CommandDestination.Service;
+        public CommandDestination Destination { get; }
         public CommandSource Source { get; } = CommandSource.User;
-        public int DestinationId { get; } = 0;
+        public int DestinationId { get; }
+
+        public ErrorsForgetCommand(CommandDestination destination, int destinationId)
+        {
+            Destination = destination;
+            DestinationId = destinationId;
+        }
     }
 
     public class OrderRepeatCommand : ICommand

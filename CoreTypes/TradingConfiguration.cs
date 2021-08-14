@@ -99,28 +99,31 @@ namespace CoreTypes
 
     public class TradingConfiguration
     {
+        public int Id=-1;
         public DateTime StartedAt { get; set; }
-        public long NextStrategyID { get; set; }
+        public int NextId { get; set; }
         public GeneralSettings GeneralSettings { get; set; } = new();
         public List<ExchangeConfiguration> Exchanges { get; set; } = new();
         public int MaxErrorsPerDay = 0;
 
         public string Verify()
         {
+            var IDs = new List<int>();
+            var strategyNames = new List<string>();
+            var currencies = new List<string>();
+            var exchanges = new List<string>();
+            var mktExs = new List<string>();
+
+            if (Id < 0) return "TradingConfiguration.Id must be non-negative";
+            IDs.Add(Id);
             if (GeneralSettings == null) return "General Settings is not specified";
             var error = GeneralSettings.Verify();
             if (error != null) return "Invalid General Settings: " + error;
             if (Exchanges == null || Exchanges.Count == 0) return "Exchanges are undefined";
             if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
 
-            var strategyIDs = new List<long>();
-            var strategyNames = new List<string>();
-            var currencies = new List<string>();
-            var exchanges = new List<string>();
-            var mktExs = new List<string>();
-
             var idx = 0;
-            foreach (var errString in Exchanges.Select(cgc => cgc.Verify(strategyIDs,strategyNames,exchanges, currencies, mktExs)))
+            foreach (var errString in Exchanges.Select(cgc => cgc.Verify(IDs,strategyNames,exchanges, currencies, mktExs)))
             {
                 if (errString != null) return $"Exchange configuration at index {idx} : {errString}";
                 ++idx;
@@ -131,11 +134,16 @@ namespace CoreTypes
     }
     public class ExchangeConfiguration
     {
+        public int Id = -1;
         public string Currency { get; set; } = "UNK";
         public string ExchangeName { get; set; } = "UNK";
+        public int MaxErrorsPerDay = 0;
         public List<MarketConfiguration> Markets { get; set; } = new ();
-        public string Verify(List<long> strategyIDs, List<string> strategyNames,List<string> exchanges,  List<string> currencies, List<string> mktExs)
+        public string Verify(List<int> IDs, List<string> strategyNames,List<string> exchanges,  List<string> currencies, List<string> mktExs)
         {
+            if (Id < 0) return "Id must be non-negative";
+            if (IDs.Contains(Id)) return $"Id duplication detected - {Id}";
+            IDs.Add(Id);
             if (string.IsNullOrWhiteSpace(Currency) || Currency.Length != 3 || Currency == "UNK")
                 return "Currency is undefined";
             if (currencies.Contains(Currency)) return $"Currency duplication detected - {Currency}";
@@ -146,9 +154,11 @@ namespace CoreTypes
             if (exchanges.Contains(ExchangeName)) return $"Exchange name duplication detected - {ExchangeName}";
             exchanges.Add(ExchangeName);
 
+            if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
+
             if (Markets == null || Markets.Count == 0) return "Markets are undefined";
             var idx = 0;
-            foreach (var errString in Markets.Select(market => market.Verify(strategyIDs, strategyNames, mktExs)))
+            foreach (var errString in Markets.Select(market => market.Verify(IDs, strategyNames, mktExs)))
             {
                 if (errString != null) return $"Market configuration at index {idx} : {errString}";
                 ++idx;
@@ -159,15 +169,20 @@ namespace CoreTypes
     }
     public class MarketConfiguration
     {
+        public int Id = -1;
         public string MarketName = "UNK";
         public string Exchange = "UNK";
         public decimal BigPointValue = -1;
         public decimal MinMove = -1;
         public decimal SessionCriticalLoss { get; set; } = decimal.MinValue;
+        public int MaxErrorsPerDay = 0;
         public List<StrategyConfiguration> Strategies { get; set; } = new ();
 
-        public string Verify(List<long> strategyIDs, List<string> strategyNames, List<string> mktExs)
+        public string Verify(List<int> IDs, List<string> strategyNames, List<string> mktExs)
         {
+            if (Id < 0) return "Id must be non-negative";
+            if (IDs.Contains(Id)) return $"Id duplication detected - {Id}";
+            IDs.Add(Id);
             if (string.IsNullOrWhiteSpace(MarketName) || MarketName == "UNK")
                 return "MarketName is undefined";
             if (string.IsNullOrWhiteSpace(Exchange) || Exchange == "UNK")
@@ -176,11 +191,12 @@ namespace CoreTypes
             if (mktExs.Contains(me)) return $"Market + Exchange pair duplicate detected - {MarketName} {Exchange}";
             mktExs.Add(me);
             if (SessionCriticalLoss >= 0) return "SessionCriticalLoss must be negative";
+            if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
             if (BigPointValue <= 0) return "BigPointValue must be positive";
             if (MinMove <= 0) return "MinMove must be positive";
             if (Strategies == null || Strategies.Count == 0) return "Strategies are undefined";
             var idx = 0;
-            foreach (var errString in Strategies.Select(sc => sc.Verify(strategyIDs, strategyNames)))
+            foreach (var errString in Strategies.Select(sc => sc.Verify(IDs, strategyNames)))
             {
                 if (errString != null) return $"Strategy configuration at index {idx} : {errString}";
                 ++idx;
@@ -353,7 +369,7 @@ namespace CoreTypes
 
     public class StrategyConfiguration
     {
-        public long StrategyID { get; set; } = -1;
+        public int Id = -1;
         public string StrategyName { get; set; } = "UNK";
         public decimal SessionCriticalLoss { get; set; } = decimal.MinValue;
         public string Timeframe { get; set; } = "UNK";
@@ -404,11 +420,28 @@ namespace CoreTypes
         /// </summary>
         public int HistorySizeToLoadInDays { get; set; } = 7;
 
-        public string Verify(List<long> strategyIDs, List<string> strategyNames)
+        // stop loss/take profit
+        public bool UseTakeProfitGuard;
+        public double TakeProfitDelta;  // must be >0
+
+        public StopLossPositionGuardTypes StopLossPositionGuardType;
+        // for FixedStopLossPositionGuardTypes.Fixed
+        public double FixedStopLossDelta;       // must be >0
+        // for FixedStopLossPositionGuardTypes.Trailed
+        public double TrailedStopLossInitialDelta;  // must be >0
+        public double TrailingDelta;                // must be >0
+        public double ActivationProfit;             // must be >0
+
+        public DynamicGuard DynamicGuardDescription = new ();
+
+        public int StoplossRestriction_MaxBarsToWaitForOppositeSignal = 1000;
+        public bool StoplossRestriction_GoToFlatMustLiftRestriction = true;
+
+        public string Verify(List<int> IDs, List<string> strategyNames)
         {
-            if (StrategyID < 0) return $"Wrong strategy ID detected {StrategyID}";
-            if (strategyIDs.Contains(StrategyID)) return $"Strategy ID duplication detected - {StrategyID}";
-            strategyIDs.Add(StrategyID);
+            if (Id < 0) return $"Id must be non-negative";
+            if (IDs.Contains(Id)) return $"Id duplication detected - {Id}";
+            IDs.Add(Id);
             if (string.IsNullOrWhiteSpace(StrategyName) || StrategyName == "UNK")
                 return $"Wrong strategy name detected - {StrategyName}";
             if (strategyNames.Contains(StrategyName)) return $"Strategy name duplication detected - {StrategyName}";

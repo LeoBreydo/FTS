@@ -30,7 +30,6 @@
         {
             _errors = 0;
         }
-
         public int Errors => _errors;
     }
 }

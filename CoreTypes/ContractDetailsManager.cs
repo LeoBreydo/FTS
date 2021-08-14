@@ -8,20 +8,24 @@ namespace CoreTypes
     {
         private ContractInfo _currentContract;
         private DateTime _lastReqDateTime;
-        private DateTime _previousSessionStart;
-        private bool _processRightNow = true;
         private readonly MarketTrader _owner;
 
         public ContractDetailsManager(MarketTrader owner)
         {
             _lastReqDateTime = DateTime.UtcNow.AddHours(-24);
-            _previousSessionStart = _lastReqDateTime;
             _owner = owner;
         }
 
+        private bool IsOutOfSession()
+        {
+            if (_currentContract == null) return true;
+            return _owner.RestrictionsManager.GetRestriction(CommandSource.EndOfSession) == TradingRestriction.HardStop;
+        }
+
+        private bool _toProcessNow ;
         public (string markeCode, string exchange, string error) ProcessContractInfo(ContractInfo ci, DateTime utcNow)
         {
-            string err = string.Empty;
+            var err = string.Empty;
             var ret = (
                 marketCode: string.Empty,
                 exchange: string.Empty,
@@ -29,8 +33,9 @@ namespace CoreTypes
             );
             if (ci != null)
             {
-                _processRightNow = false;
+                _toProcessNow = true;
                 _currentContract = ci;
+                _owner.SetBigPointValue(_currentContract.Multiplier);
                 _owner.ContractCode = ci.LocalSymbol;
                 if (!AdjustDateTimes())
                 {
@@ -40,25 +45,24 @@ namespace CoreTypes
             }
             else
             {
-                if (!_processRightNow)
-                {
-                    _processRightNow = true;
-                    return ret;
-                }
+                _toProcessNow = false;
             }
             if (_currentContract == null)
             {
-                _owner.RestrictionsManager.SetEndOfContractRestriction(TradingRestriction.HardStop);
-                _owner.RestrictionsManager.SetEndOfSessionRestriction(TradingRestriction.HardStop);
-                // request contract details for first time and every 5 minutes till it gets them
-                if ((utcNow - _lastReqDateTime).TotalMinutes > 4)
+                if (_toProcessNow)
                 {
-                    _lastReqDateTime = utcNow;
-                    ret = (
-                        marketCode: _owner.MarketCode,
-                        exchange: _owner.Exchange,
-                        error: err
-                    );
+                    _owner.RestrictionsManager.SetEndOfContractRestriction(TradingRestriction.HardStop);
+                    _owner.RestrictionsManager.SetEndOfSessionRestriction(TradingRestriction.HardStop);
+                    // request contract details for first time and every 5 minutes till it gets them
+                    if ((utcNow - _lastReqDateTime).TotalMinutes > 4)
+                    {
+                        _lastReqDateTime = utcNow;
+                        ret = (
+                            marketCode: _owner.MarketCode,
+                            exchange: _owner.Exchange,
+                            error: err
+                        );
+                    }
                 }
             }
             else if (utcNow.Second == 0 && utcNow.Minute % 10 == 0) // every ten minutes
@@ -69,24 +73,31 @@ namespace CoreTypes
 
                 var condition = utcNow < _currentContract.StartLiquidHours
                                 || utcNow > _currentContract.EndLiquidHours;
-
+                var outOfSessionBefore = IsOutOfSession(); 
                 _owner.RestrictionsManager.SetEndOfSessionRestriction(condition
                     ? TradingRestriction.HardStop
                     : TradingRestriction.NoRestrictions);
-                if (condition && (utcNow - _lastReqDateTime).TotalHours > 23)
+                var outOfSessionAfter = IsOutOfSession();
+                switch (outOfSessionBefore)
                 {
-                    _lastReqDateTime = utcNow;
-                    ret = (
-                        marketCode: _owner.MarketCode,
-                        exchange: _owner.Exchange,
-                        error: string.Empty
-                    );
-                }
-
-                if (!condition && (utcNow - _previousSessionStart).TotalHours > 23)
-                {
-                    _previousSessionStart = utcNow;
-                    foreach (var s in _owner.Strategies) s.Position.StartNewSession();
+                    case false when outOfSessionAfter:
+                    {
+                        var settlementPrice = _owner.Position.PriceProvider.LastPrice;
+                        foreach (var s in _owner.StrategyMap.Values)
+                            s.Position.ProcessSettlementPrice(settlementPrice);
+                        ret = (
+                            marketCode: _owner.MarketCode,
+                            exchange: _owner.Exchange,
+                            error: string.Empty
+                        );
+                        break;
+                    }
+                    case true when !outOfSessionAfter:
+                    {
+                        foreach (var s in _owner.StrategyMap.Values)
+                            s.Position.StartNewSession();
+                        break;
+                    }
                 }
             }
 
@@ -112,9 +123,9 @@ namespace CoreTypes
             return true;
         }
 
-        public List<string> ApplyCurrentTime(DateTime currentUtcTime, out List<int> idList)
+        public List<int> CancelOutdatedOrders(DateTime currentUtcTime)
         {
-            return _owner.ApplyCurrentTime(currentUtcTime, out idList);
+            return _owner.CancelOutdatedOrders(currentUtcTime);
         }
     }
 }

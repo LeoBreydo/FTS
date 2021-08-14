@@ -5,7 +5,8 @@ namespace CoreTypes
     public enum OrderStateMessageType
     {
         Cancel = 0,
-        Execution = 1
+        Execution = 1,
+        Post = 2
     }
     public abstract class OrderStateMessage
     {
@@ -34,6 +35,32 @@ namespace CoreTypes
         }
         public override OrderStateMessageType MyType { get; } = OrderStateMessageType.Cancel;
         public override int OrderId { get; }
+
+        public override string ToString() => 
+            $"Time: {UtcNow:yyyyMMdd:HHmmss}, CancelReason: {CancelReason}, OId: {OrderId}, ClientOId: {ClOrderId}";
+    }
+
+    public class OrderPostMessage : OrderStateMessage
+    {
+        public string Symbol;
+        public string ContractCode;
+        public string Exchange;
+        public int SgnQty;
+
+        public OrderPostMessage(int clOrderId, DateTime utcNow, int orderId, string symbol, string contractCode, string exchange, 
+            int sgnQty) : base(clOrderId, utcNow)
+        {
+            OrderId = orderId;
+            Symbol = symbol;
+            ContractCode = contractCode;
+            Exchange = exchange;
+            SgnQty = sgnQty;
+        }
+        public override OrderStateMessageType MyType { get; } = OrderStateMessageType.Post;
+        public override int OrderId { get; }
+
+        public override string ToString() => 
+            $"Time: {UtcNow:yyyyMMdd:HHmmss}, Mkt: {Symbol}, Exch: {Exchange}, ContCode: {ContractCode},  SgnQty: {SgnQty}, OId: {OrderId}, ClientOId: {ClOrderId}";
     }
 
     public class OrderExecutionMessage : OrderStateMessage
@@ -64,6 +91,8 @@ namespace CoreTypes
         }
         public override OrderStateMessageType MyType { get; } = OrderStateMessageType.Execution;
         public override int OrderId { get; }
+        public override string ToString() => 
+            $"Time: {TransactTime:yyyyMMdd:HHmmss}, Mkt{Symbol}, Exch: {Exchange}, ContCode: {ContractCode},  SgnQty: {SgnQty}, Price: {Price}, ExecId: {ExecId}, OId: {OrderId}, ClientOId: {ClOrderId}";
     }
 
     

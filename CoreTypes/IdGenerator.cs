@@ -14,19 +14,15 @@ namespace CoreTypes
         public int GetNextId() => Interlocked.Increment(ref _seed);
     }
 
-    public static class IdGenerators
+    public static class ClientOIdProvider
     {
         private static readonly IdGenerator _clOrderIdGenerator;
-        private static readonly IdGenerator _internalIdGenerator;
 
-        static IdGenerators()
+        static ClientOIdProvider()
         {
-            _internalIdGenerator = new(0);
-            _clOrderIdGenerator = new((int) (DateTime.Now - new DateTime(2021, 7, 1)).TotalSeconds / 10);
+            _clOrderIdGenerator = new((int) ((DateTime.Now - new DateTime(2021, 7, 1)).TotalSeconds / 10));
         }
 
         public static int GetNextClientOrderId() => _clOrderIdGenerator.GetNextId();
-        public static int GetNextInternalId() => _internalIdGenerator.GetNextId();
-
     }
 }

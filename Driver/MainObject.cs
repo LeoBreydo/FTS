@@ -12,6 +12,7 @@ namespace Driver
         public ClientCommunicationFacade Client {get;}
         public Scheduler Scheduler { get; }  
         public InfoLogger Logger { get; }
+        public SignalService SignalService { get; }
         
         public MainObject()
         {
@@ -22,7 +23,8 @@ namespace Driver
             // 2) web controller communicator
 
             Configuration = ReadAndVerifyConfiguration("./cfg.xml");
-            TService = new TradingService(Configuration);
+            SignalService = new SignalService();
+            TService = new TradingService(Configuration, SignalService);
             Client = new ClientCommunicationFacade();
             Scheduler = new Scheduler();
             Logger = new(15, "./");
@@ -40,13 +42,12 @@ namespace Driver
 
             var clientCmdList = Client.GetCommands();
             var schedulerCmdList = Scheduler.GetCommands();
-
-            var (subscriptions, orders, state, ticksInfo, barsInfo, tradesInfo, errors) = TService.ProcessCurrentState(so, clientCmdList, schedulerCmdList);
-            Facade.PlaceRequest(subscriptions, orders);
-            Client.PushInfo(state);
+            var t = TService.ProcessCurrentState(so, clientCmdList, schedulerCmdList);
+            Facade.PlaceRequest(t.Subscriptions, t.Orders);
+            Client.PushInfo(t.State);
             
-            Logger.PostToLog(so.CurrentUtcTime, ticksInfo, barsInfo, tradesInfo,
-                so.OrderStateMessageList, so.TextMessageList, errors);
+            Logger.PostToLog(so.CurrentUtcTime, t.TicksInfo, t.BarsInfo, t.TradesInfo,
+                so.OrderStateMessageList, so.TextMessageList, t.Errors);
         }
 
         public void Stop()

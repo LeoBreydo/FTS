@@ -11,7 +11,7 @@ namespace CoreTypes
         {
             var (bid, ask, last) = caller.Position.PriceProvider.LastPrices;
             if (bid == -1 || ask == -1 || last == -1) return (caller, null, new());
-            var so = caller.Strategies
+            var so = caller.StrategyMap.Values
                 .Select(s => s.GenerateOrder((bid, ask, last)))
                 .Where(t => t.NbrOfContracts != 0)
                 .ToList();
@@ -67,7 +67,7 @@ namespace CoreTypes
             var (buyOrders, sellOrders) =
                 (so.Where(o => o.NbrOfContracts > 0).ToList(), so.Where(o => o.NbrOfContracts < 0).ToList());
 
-            clBasketID = IdGenerators.GetNextClientOrderId();
+            clBasketID = ClientOIdProvider.GetNextClientOrderId();
             var clOrderID = clBasketID + "_internal";
 
             List<StrategyOrderInfo> notFilledOrders;
@@ -133,25 +133,21 @@ namespace CoreTypes
         {
             errorMessage = null;
             var clId = report.ClOrderId;
-            (List<string> tlist, bool isOrderFinished) ret = new();
-            switch (report.MyType)
+            (List<string> tlist, bool isOrderFinished) ret = report.MyType switch
             {
-                case OrderStateMessageType.Cancel:
-                    ret = Handle(owner, (OrderCancelMessage)report, utcNow, out errorMessage);
-                    break;
-                case OrderStateMessageType.Execution:
-                    ret = Handle(owner, (OrderExecutionMessage)report, utcNow, out errorMessage);
-                    break;
-            }
+                OrderStateMessageType.Cancel => Handle(owner, report, out errorMessage),
+                OrderStateMessageType.Execution => Handle(owner, (OrderExecutionMessage) report, utcNow, out errorMessage),
+                _ => new ()
+            };
 
             return ret;
         }
 
         private static (List<string> tlist, bool isOrderFinished) Handle(MarketTrader owner, 
-            OrderCancelMessage report, DateTime utcNow, out string errorMessage)
+            OrderStateMessage report, out string errorMessage)
         {
-            errorMessage =
-                $"Order (id = {report.OrderId}) for contract (contract code is {owner.ContractCode} was rejected by {report.CancelReason}";
+            owner.ErrorCollector.ApplyErrors(1);
+            errorMessage = null;
             var clOrdId = report.ClOrderId;
             if (owner.PostedOrderMap.ContainsKey(clOrdId))
             {
@@ -171,7 +167,7 @@ namespace CoreTypes
         private static (List<string> tlist, bool isOrderFinished) Handle(MarketTrader owner, 
             OrderExecutionMessage report, DateTime utcNow, out string errorMessage)
         {
-            errorMessage = null;
+            errorMessage = string.Empty;
             var trades = new List<string>();
             var clOrdId = report.ClOrderId;
             if (!owner.PostedOrderMap.ContainsKey(clOrdId))
@@ -185,6 +181,7 @@ namespace CoreTypes
                     // 2) generate error message to client/log
                     errorMessage =
                         $"Execution error detected - unexpected operation for {owner.ContractCode} for {report.SgnQty} contracts was executed (order id is {report.OrderId}). Offset deal is auto-generated.";
+                    owner.ErrorCollector.ApplyErrors(1);
                 }
 
                 // 3) mark order as executed
@@ -213,6 +210,7 @@ namespace CoreTypes
                 // 2) generate error message to client/log
                 errorMessage =
                     $"Execution error detected - no operation was expected for {owner.ContractCode}, but deal for {(int) report.SgnQty} contracts was executed (order id is {report.OrderId}). Offset deal is auto-generated.";
+                owner.ErrorCollector.ApplyErrors(1);
                 // 3) remove order from postedOrdersMap
                 owner.PostedOrderMap.Remove(clOrdId);
                 // 4) mark order as executed
@@ -231,6 +229,7 @@ namespace CoreTypes
                 //2)generate error message to client/log
                 errorMessage =
                     $"Execution error detected - buy/sell mismatch for {owner.ContractCode} (order id is {report.OrderId}). Offset deal is auto-generated.";
+                owner.ErrorCollector.ApplyErrors(1);
                 //3)cancel waiting orders at all others bindings 
                 var bcnt = bindings.Count;
                 for (var i = 1; i < bcnt; ++i) owner.StrategyMap[bindings[i].StrategyId].CurrentOperationAmount = 0;
@@ -259,6 +258,7 @@ namespace CoreTypes
                 //2)generate error message to client/log
                 errorMessage =
                     $"Execution error detected - order for {owner.ContractCode} is overfilled by {surplus}  contracts (order id is {report.OrderId}). Offset deal is auto-generated.";
+                owner.ErrorCollector.ApplyErrors(1);
                 //3)remove order from postedOrdersMap
                 owner.PostedOrderMap.Remove(clOrdId);
                 //4)mark order as executed

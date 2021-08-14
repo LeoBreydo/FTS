@@ -11,9 +11,9 @@ namespace CoreTypes
         private readonly BlockingCollection<string> _tiList = new();
         private readonly BlockingCollection<string> _barList = new();
         private readonly BlockingCollection<string> _tradeList = new();
-        private readonly BlockingCollection<OrderStateMessage> _orderStateMessages = new();
-        private readonly BlockingCollection<Tuple<string, string>> _msgList = new();
-        private readonly BlockingCollection<(string,string,string)> _errorsList = new();
+        private readonly BlockingCollection<string> _orderStateMessages = new();
+        private readonly BlockingCollection<string> _msgList = new();
+        private readonly BlockingCollection<string> _errorsList = new();
 
         private readonly int _saveEveryNthMinute;
         private DateTime _lastSaveTime;
@@ -86,18 +86,18 @@ namespace CoreTypes
             _errorsList?.Dispose();
         }
 
-        //TODO add DateTime to log items!!!
         public void PostToLog(DateTime utcNow, List<string> tickInfoList, List<string> newBars,
             List<string> newTrades, List<OrderStateMessage> orderStateMessageList,
             List<Tuple<string, string>> textMessageList, List<(string,string,string)> errorMessages)
         {
+            var dt = $"{utcNow:yyyyMMdd:HHmmss}";
             foreach(var item in tickInfoList)_tiList.Add(item);
             foreach(var item in newBars) _barList.Add(item);
             foreach(var item in newTrades) _tradeList.Add(item);
-            foreach(var item in orderStateMessageList) _orderStateMessages.Add(item);
-            foreach(var item in textMessageList) _msgList.Add(item);
-            foreach (var item in errorMessages) _errorsList.Add(item);
-            
+            foreach(var item in orderStateMessageList) _orderStateMessages.Add(item.ToString());
+            foreach(var (item1, item2) in textMessageList) _msgList.Add($"{dt} {item1} : {item2}");
+            foreach (var (item1, item2, item3) in errorMessages) _errorsList.Add($"{dt} {item1} {item2} : {item3}");
+
             if ((utcNow - _lastSaveTime).TotalMinutes >= _saveEveryNthMinute)
             {
                 _lastSaveTime = utcNow;

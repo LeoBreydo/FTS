@@ -6,18 +6,15 @@ namespace CoreTypes
     public class TradingServiceState
     {
         public List<Tuple<string, string>> MessagesToShow;
-        public List<(string market, string exchange, string txt)> ErrorMessagesToProcess;
         public int DayErrorNbr;
         public string Restrictions;
         public List<CurrencyGroupState> CurrencyGroupStates=new ();
 
-        public TradingServiceState(List<Tuple<string, string>> messagesToShow, 
-            List<(string market, string exchange, string txt)> errorMessagesToProcess,
+        public TradingServiceState(List<Tuple<string, string>> messagesToShow,
             TradingService ts)
         {
             MessagesToShow = messagesToShow;
-            ErrorMessagesToProcess = errorMessagesToProcess;
-            DayErrorNbr = ts.Collector.Errors;
+            DayErrorNbr = ts.ErrorCollector.Errors;
             Restrictions = ts.RestrictionManager.GetRestrictions();
             foreach (var (key, value) in ts.Positions)
                 CurrencyGroupStates.Add(new CurrencyGroupState(key, value));
@@ -42,7 +39,7 @@ namespace CoreTypes
 
     public class ExchangeState
     {
-        public int InternalId;
+        public int Id;
         public string Exchange;
         public decimal UnrealizedResult;
         public decimal RealizedResult;
@@ -51,7 +48,7 @@ namespace CoreTypes
 
         public ExchangeState(ExchangeTrader et)
         {
-            InternalId = et.InternalID;
+            Id = et.Id;
             Exchange = et.Exchange;
             UnrealizedResult = et.Position.UnrealizedResult;
             RealizedResult = et.Position.RealizedResult;
@@ -62,7 +59,7 @@ namespace CoreTypes
 
     public class MarketState
     {
-        public int InternalId;
+        public int Id;
         public string MarketName;
         public string ContractCode;
         public decimal UnrealizedResult;
@@ -75,7 +72,7 @@ namespace CoreTypes
 
         public MarketState(MarketTrader mt)
         {
-            InternalId = mt.InternalID;
+            Id = mt.Id;
             MarketName = mt.MarketCode;
             ContractCode = mt.ContractCode;
             UnrealizedResult = mt.Position.UnrealizedResult;
@@ -84,13 +81,13 @@ namespace CoreTypes
             ShortSize = mt.Position.ShortSize;
             SessionResult = mt.Position.LossManager.SessionResult;
             Restrictions = mt.RestrictionsManager.GetRestrictions();
-            foreach (var st in mt.Strategies) StrategyStates.Add(new StrategyState(st));
+            foreach (var st in mt.StrategyMap.Values) StrategyStates.Add(new StrategyState(st));
         }
     }
 
     public class StrategyState
     {
-        public int InternalId;
+        public int Id;
         public decimal UnrealizedResult;
         public decimal RealizedResult;
         public int Size;
@@ -99,7 +96,7 @@ namespace CoreTypes
 
         public StrategyState(StrategyTrader st)
         {
-            InternalId = st.InternalID;
+            Id = st.Id;
             UnrealizedResult = st.Position.UnrealizedResult;
             RealizedResult = st.Position.RealizedResult;
             Size = st.Position.Size;

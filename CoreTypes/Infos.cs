@@ -11,8 +11,8 @@ namespace CoreTypes
 
         public StrategyOrderInfo(int strategyId, int nbrOfContracts)
         {
-            StrategyId = strategyId;
             NbrOfContracts = nbrOfContracts;
+            StrategyId = strategyId;
         }
     }
 

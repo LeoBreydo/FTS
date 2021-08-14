@@ -63,7 +63,7 @@ namespace Utilities
                 using var fs = new FileStream(FileName, FileMode.Open,FileAccess.Read,FileShare.ReadWrite);
                 res = (T)serializer.Deserialize(fs);
             }
-            catch(Exception excp)
+            catch
             {
                 if (Rethrow) throw; res = default;
             }

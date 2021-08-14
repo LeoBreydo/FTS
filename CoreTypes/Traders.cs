@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 
 namespace CoreTypes
 {
     public class ExchangeTrader : ICommandReceiver
     {
-        public int InternalID { get; }
+        public int Id { get; private set; }
         public string Exchange { get; }
         public string Currency { get; }
 
@@ -24,12 +25,23 @@ namespace CoreTypes
         private TradingRestriction _currentRestriction;
         private readonly ExchangeRestrictionsManager _restrictionsManager = new();
         public ExchangeRestrictionsManager RestrictionsManager => _restrictionsManager;
+        public ErrorCollector ErrorCollector;
 
         public void ApplyCommand(ICommand command)
         {
             var s = command.Source;
-            if (s == CommandSource.User && command is RestrictionCommand restrictionCommand)
-                _restrictionsManager.SetUserRestriction(restrictionCommand.Restriction);
+            if (s == CommandSource.User)
+            {
+                switch (command)
+                {
+                    case RestrictionCommand restrictionCommand:
+                        _restrictionsManager.SetUserRestriction(restrictionCommand.Restriction);
+                        break;
+                    case ErrorsForgetCommand:
+                        ErrorCollector.ForgetErrors = true;
+                        break;
+                }
+            }
         }
 
         public void UpdateParentRestrictions(TradingRestriction parentRestriction)
@@ -41,32 +53,32 @@ namespace CoreTypes
 
         public ExchangePosition Position { get; }
 
-        public ExchangeTrader(int internalId, string exchange, string currency)
+        public ExchangeTrader(int id, string exchange, string currency, int maxErrorsPerDay)
         {
-            InternalID = internalId;
+            Id = id;
             Exchange = exchange;
             Currency = currency;
             Position = new ExchangePosition(this);
             _currentRestriction = _restrictionsManager.GetCurrentRestriction();
+            ErrorCollector = new ErrorCollector(maxErrorsPerDay);
         }
     }
 
     public class MarketTrader : ICommandReceiver
     {
-        public int InternalID { get; }
+        public int Id { get; private set; }
         public string MarketCode { get; }
         public string ContractCode { get; set; } = string.Empty;
         public string Exchange { get; private set; }
         public readonly ContractDetailsManager ContractManager;
+        public readonly ErrorCollector ErrorCollector;
 
         #region structure
-        public List<StrategyTrader> Strategies { get; } = new();
         public Dictionary<int, StrategyTrader> StrategyMap { get; } = new();
         public Dictionary<int, (List<StrategyOrderInfo>,DateTime)> PostedOrderMap { get; } = new();
         public void RegisterStrategyTrader(StrategyTrader st)
         {
-            StrategyMap.Add(st.InternalID, st);
-            Strategies.Add(st);
+            StrategyMap.Add(st.Id, st);
             Position.RegisterStrategyPosition(st);
         }
         #endregion // structure
@@ -76,8 +88,18 @@ namespace CoreTypes
         public void ApplyCommand(ICommand command)
         {
             var s = command.Source;
-            if (s == CommandSource.User && command is RestrictionCommand restrictionCommand)
-                RestrictionsManager.SetUserRestriction(restrictionCommand.Restriction);
+            if (s == CommandSource.User)
+            {
+                switch (command)
+                {
+                    case RestrictionCommand restrictionCommand:
+                        RestrictionsManager.SetUserRestriction(restrictionCommand.Restriction);
+                        break;
+                    case ErrorsForgetCommand:
+                        ErrorCollector.ForgetErrors = true;
+                        break;
+                }
+            }
         }
         public void UpdateParentRestrictions(TradingRestriction parentRestriction)
         {
@@ -87,18 +109,19 @@ namespace CoreTypes
                     ? TradingRestriction.HardStop
                     : TradingRestriction.NoRestrictions);
             _currentRestriction = RestrictionsManager.GetCurrentRestriction();
-            foreach (var st in Strategies) st.UpdateParentRestrictions(_currentRestriction);
+            foreach (var st in StrategyMap.Values) st.UpdateParentRestrictions(_currentRestriction);
         }
         public MarketPosition Position { get; }
         // arguments must be correct
-        public MarketTrader(int internalId, string marketCode, string exchange, decimal criticalLoss)
+        public MarketTrader(int id, string marketCode, string exchange, int maxErrorsPerDay, decimal criticalLoss)
         {
-            InternalID = internalId;
-            Position = new MarketPosition(criticalLoss);
+            Id = id;
+            Position = new MarketPosition(this, criticalLoss);
             MarketCode = marketCode;
             Exchange = exchange;
             _currentRestriction = RestrictionsManager.GetCurrentRestriction();
             ContractManager = new(this);
+            ErrorCollector = new ErrorCollector(maxErrorsPerDay);
         }
         public (MarketTrader, MarketOrderDescription order, List<string>) GenerateOrders(DateTime utcNow)
         {
@@ -166,39 +189,35 @@ namespace CoreTypes
             return t;
         }
 
-        public List<string> ApplyCurrentTime(DateTime currentUtcTime, out List<int> idList)
+        public List<int> CancelOutdatedOrders(DateTime currentUtcTime)
         {
-            idList = new();
-            List<string> messages = new();
-            List<int> keysToRemove = new();
-            foreach (var kvp in PostedOrderMap)
+            List<int> orderIdsToCancel = new();
+            foreach (var (key, value) in PostedOrderMap
+                .Where(kvp => (currentUtcTime - kvp.Value.Item2).TotalMinutes >= 2))
             {
-                if ((currentUtcTime - kvp.Value.Item2).TotalMinutes >= 3)
-                {
-                    messages.Add($"order for market {MarketCode} at {Exchange} was cancelled by timeout");
-                    foreach (var s in kvp.Value.Item1.Select(b => StrategyMap[b.StrategyId]))
-                        s.CurrentOperationAmount = 0;
-                    keysToRemove.Add(kvp.Key);
-                }
+                foreach (var s in value.Item1.Select(b => StrategyMap[b.StrategyId]))
+                    s.CurrentOperationAmount = 0;
+                orderIdsToCancel.Add(key);
             }
+            ErrorCollector.ApplyErrors(orderIdsToCancel.Count);
+            foreach (var key in orderIdsToCancel) PostedOrderMap.Remove(key);
+            return orderIdsToCancel;
+        }
 
-            foreach (var key in keysToRemove)
-            {
-                PostedOrderMap.Remove(key);
-                idList.Add(key);
-            }
-            return messages;
+        public void SetBigPointValue(int bpv)
+        {
+            foreach (var st in StrategyMap.Values)
+                st.Position.SetBigPointValue(bpv);
         }
     }
 
     public class StrategyTrader : ICommandReceiver
-    {
-        public int InternalID { get; }
+    { 
         public int Id { get; private set; }
         public SignalService SignalService { get; private set; }
         public StrategyPosition Position { get; private set; }
         public int CurrentOperationAmount { get; set; } = 0;
-        public int ContractsNbr { get; set; } = 1;
+        public int ContractsNbr { get; private set; } = 1;
 
         public int OffsetDealAmount = 0; // mandatory execution!!
 
@@ -207,13 +226,20 @@ namespace CoreTypes
         private TradingRestriction _currentRestriction;
         public StrategyRestrictionsManager RestrictionsManager => _restrictionsManager;
 
-        public StrategyTrader(int internalId, int id, StrategyPosition position, SignalService signalService)
+        public PositionValidator PositionValidator;
+
+        public StrategyTrader(int id, StrategyPosition position, int contractsNumber, 
+            SignalService signalService, PositionValidator positionValidator)
+            
         {
-            InternalID = internalId;
             Id = id;
             Position = position;
+            contractsNumber = Math.Abs(contractsNumber);
+            if (contractsNumber < 1) contractsNumber = 1;
+            ContractsNbr = contractsNumber;
             SignalService = signalService;
             _currentRestriction = _restrictionsManager.GetCurrentRestriction();
+            PositionValidator = positionValidator;
         }
 
         public void ApplyCommand(ICommand command)
@@ -280,24 +306,51 @@ namespace CoreTypes
 
         public StrategyOrderInfo GenerateOrder((decimal bid, decimal ask, decimal last) lastQuotations)
         {
-            var newSignal = SignalService.GetSignal(InternalID);
+            var newSignal = SignalService.GetSignal(Id);
+            if (newSignal != Signal.NO_SIGNAL)
+            {
+                PositionValidator.UpdateAtStartOfBar((double)lastQuotations.last);
+                var tp = newSignal switch
+                {
+                    Signal.TO_FLAT => 0,
+                    Signal.TO_LONG => 1,
+                    _ => -1
+                };
+                PositionValidator.UpdateStopLossRestrictionByNewTargetPosition(tp);
+            }
+            else PositionValidator.UpdateLastPrice((double)lastQuotations.last);
+
             if (CurrentOperationAmount != 0)
             {
                 // we can not send order (real position is unknown),
                 // but we must save new signal (if any) for later
                 if (newSignal != Signal.NO_SIGNAL) _lastSignal = newSignal;
-                return new StrategyOrderInfo(InternalID, 0);
+                return new StrategyOrderInfo(Id, 0);
             }
 
             if (_lastSignal == Signal.NO_SIGNAL) // no signal at the moment
             {
                 var amount = OffsetDealAmount != 0 ? OffsetDealAmount : 0;
                 OffsetDealAmount = 0;
-                return new StrategyOrderInfo(InternalID, amount);
+                return new StrategyOrderInfo(Id, amount);
+            }
+            if (!PositionValidator.ValidateCurrentPosition())
+            {
+                _lastSignal = Signal.NO_SIGNAL;
+                CurrentOperationAmount = -Position.Size;
+                return new StrategyOrderInfo(Id, CurrentOperationAmount);
             }
             SetOrderSize(lastQuotations.last);
             _lastSignal = Signal.NO_SIGNAL;
-            return new StrategyOrderInfo(InternalID, CurrentOperationAmount);
+            if (CurrentOperationAmount != 0)
+            {
+                var tp = CurrentOperationAmount - Position.Size;
+                if (PositionValidator.ValidateSuggestedPosition(tp))
+                    return new StrategyOrderInfo(Id, CurrentOperationAmount);
+                CurrentOperationAmount = 0;
+                return new StrategyOrderInfo(Id, 0);
+            }
+            return new StrategyOrderInfo(Id, 0);
         }
     }
 }

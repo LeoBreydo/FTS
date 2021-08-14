@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using static System.Math;
 
 namespace CoreTypes
@@ -14,16 +15,19 @@ namespace CoreTypes
         {
         }
 
-        public void Update()
+        public int Update(bool resetErrors)
         {
             UnrealizedResult = 0;
             RealizedResult = 0;
+            var en = 0;
             foreach (var ep in ExchangePositions)
             {
-                ep.Update();
+                en += ep.Update(resetErrors);
                 UnrealizedResult += ep.UnrealizedResult;
                 RealizedResult += ep.RealizedResult;
             }
+
+            return en;
         }
 
         public void RegisterExchangePosition(ExchangeTrader et)
@@ -46,18 +50,27 @@ namespace CoreTypes
             Owner = owner;
         }
 
-        public void Update()
+        public int Update(bool resetErrors)
         {
             UnrealizedResult = 0;
             RealizedResult = 0;
             DealNbr = 0;
+            var en = 0;
             foreach (var ip in MarketPositions)
             {
-                ip.Update();
+                en = ip.Update(resetErrors);
                 UnrealizedResult += ip.UnrealizedResult;
                 RealizedResult += ip.RealizedResult;
                 DealNbr += ip.DealNbr;
             }
+
+            Owner.ErrorCollector.Reset();
+            if (Owner.ErrorCollector.ForgetErrors) Owner.ErrorCollector.ForgetErrors = false;
+            else Owner.ErrorCollector.ApplyErrors(en);
+            Owner.RestrictionsManager.SetErrorsNbrRestriction(Owner.ErrorCollector.IsStopped
+                ? TradingRestriction.HardStop
+                : TradingRestriction.NoRestrictions);
+            return en;
         }
 
         public void RegisterMarketPosition(MarketTrader mp)
@@ -79,15 +92,18 @@ namespace CoreTypes
 
         public PriceProvider PriceProvider { get; }
 
-        public MarketPosition(decimal criticalLoss = decimal.MinValue)
+        private readonly MarketTrader _owner;
+
+        public MarketPosition(MarketTrader owner, decimal criticalLoss = decimal.MinValue)
         {
             LossManager = new MarketCriticalLossManager(this, criticalLoss);
             PriceProvider = new PriceProvider();
+            _owner = owner;
         }
 
-        public void Update()
+        public int Update(bool resetErrors)
         {
-            if (PriceProvider.LastPrice == -1) return;
+            if (PriceProvider.LastPrice == -1) return 0;
             var currentPrice = PriceProvider.LastPrice;
             LongSize = 0;
             ShortSize = 0;
@@ -95,6 +111,7 @@ namespace CoreTypes
             RealizedResult = 0;
             DealNbr = 0;
             LossManager.SessionResult = 0;
+            if (resetErrors) _owner.ErrorCollector.Reset();
             foreach (var sp in StrategyPositions)
             {
                 sp.UpdatePosition(currentPrice);
@@ -106,6 +123,15 @@ namespace CoreTypes
                 LossManager.SessionResult += sp.LossManager.SessionResult;
             }
             LossManager.UpdateState();
+            if (_owner.ErrorCollector.ForgetErrors)
+            {
+                _owner.ErrorCollector.ForgetErrors = false;
+                _owner.ErrorCollector.Reset();
+            }
+            _owner.RestrictionsManager.SetErrorsNbrRestriction(_owner.ErrorCollector.IsStopped
+                ? TradingRestriction.HardStop
+                : TradingRestriction.NoRestrictions);
+            return _owner.ErrorCollector.Errors;
         }
 
         public void RegisterStrategyPosition(StrategyTrader strategy)
@@ -127,7 +153,7 @@ namespace CoreTypes
         public readonly string StrategyName;
         // exec, size, last settlement price (initial -1)
         private readonly List<(Execution, int, decimal)> _openDeals = new();
-        private readonly decimal _bpv, _minMove;
+        private decimal _bpv;
 
         public StrategyCriticalLossManager LossManager { get; private set; }
         public int Size { get; private set; }
@@ -143,19 +169,18 @@ namespace CoreTypes
             : StrategyPositionStateEnum.Flat;
 
         public int DealNbr => _openDeals.Count;
+        public double WeightedOpenQuote { get; set; } = 0;
+
+        public StrategyTrader Owner { get; set; }
 
         // bigPointValue and minMove <- market trader configuration
-        public StrategyPosition(int strategyId, string strategyName, decimal bigPointValue, decimal minMove,
-            decimal criticalLoss = decimal.MinValue)
+        public StrategyPosition(int strategyId, string strategyName, decimal criticalLoss = decimal.MinValue)
         {
             if (strategyId < 0) throw new Exception("strategyId < 0");
             if (string.IsNullOrWhiteSpace(strategyName)) throw new Exception("strategy name is null or empty");
-            if (bigPointValue <= 0) throw new Exception("bigPointValue <= 0");
-            if (minMove <= 0) throw new Exception("minMove <= 0");
             StrategyId = strategyId;
             StrategyName = strategyName;
-            _bpv = bigPointValue;
-            _minMove = minMove;
+            _bpv = 1;
             LossManager = new StrategyCriticalLossManager(this, criticalLoss);
         }
 
@@ -177,6 +202,7 @@ namespace CoreTypes
             }
 
             _refQuote = settlementPrice;
+            Owner.PositionValidator.ClearStopLossRestriction();
         }
 
         public List<string> ProcessNewDeals(IEnumerable<(Execution, int)> deals)
@@ -260,18 +286,29 @@ namespace CoreTypes
 
             Size = 0;
             _refQuote = 0;
+            var woq = 0m;
             foreach (var (e, s, p) in _openDeals)
             {
                 Size += s;
-                _refQuote += Abs(s) * (p == -1 ? e.Price : p);
+                _refQuote += (s * (p == -1 ? e.Price : p));
+                woq += s * e.Price;
             }
 
-            _refQuote /= Abs(Size);
+            _refQuote /= Size;
+            woq /= Size;
+            WeightedOpenQuote = (double) woq;
+
+            Owner.PositionValidator.UpdateGuards();
 
             return trades;
         }
 
         public void StartNewSession() =>
             LossManager.StartNewSession(RealizedResult + UnrealizedResult);
+
+        public void SetBigPointValue(int bpv)
+        {
+            _bpv = bpv;
+        }
     }
 }

@@ -56,7 +56,10 @@ namespace CoreTypes
                 .ToList());
         }
 
-
+        public TradingRestriction GetRestriction(CommandSource cs)
+        {
+            return _restrictions[cs.ToInt()];
+        }
     }
 
     public class ServiceRestrictionsManager : TradingRestrictionManager
@@ -78,6 +81,9 @@ namespace CoreTypes
 
         public void SetUserRestriction(TradingRestriction r) =>
             SetRestriction(r, CommandSource.User);
+
+        public void SetErrorsNbrRestriction(TradingRestriction r) =>
+            SetRestriction(r, CommandSource.ErrorsNbr);
     }
 
     public class MarketRestrictionsManager : TradingRestrictionManager
@@ -96,6 +102,9 @@ namespace CoreTypes
 
         public void SetEndOfSessionRestriction(TradingRestriction r) =>
             SetRestriction(r, CommandSource.EndOfSession);
+
+        public void SetErrorsNbrRestriction(TradingRestriction r) =>
+            SetRestriction(r, CommandSource.ErrorsNbr);
     }
 
     public class StrategyRestrictionsManager : TradingRestrictionManager

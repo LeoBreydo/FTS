@@ -285,7 +285,8 @@ namespace BrokerFacadeIB
                     while (ExistsOrder(orderId)) orderId = _nextOrderId++;
                     AddMessage("INFO","orderId corrected -> " + orderId);
                 }
-
+                _orderReportQueue.Add(new OrderPostMessage(clientOrderId,DateTime.UtcNow,orderId,
+                    order.Symbol,contract.LocalSymbol,order.Exchange,order.SignedContractsNbr));
                 _activeOrders.Add(new OrderInfo(orderId, clientOrderId, _secondsCount, qty, order.Symbol, action));
                 _activeOrdersR = _activeOrders.ToArray();
 
