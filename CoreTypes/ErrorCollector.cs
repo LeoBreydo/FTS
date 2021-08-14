@@ -3,33 +3,40 @@
     public class ErrorCollector
     {
         public int MaxErrorsPerDay { get; }
-        private int _errors;
-
-        public bool ForgetErrors = false;
+        private int _levelAtForgetMoment;
+        public bool ForgetErrors;
 
         public ErrorCollector(int maxErrorsPerDay)
         {
             if (maxErrorsPerDay < 0) maxErrorsPerDay = 0;
             MaxErrorsPerDay = maxErrorsPerDay;
-            _errors = 0;
+            Errors = 0;
+            _levelAtForgetMoment = 0;
         }
 
-        public void ApplyErrors(int errorNbr)
+        public void SetErrorsAndEvaluateState(int allErrors)
         {
-            _errors += errorNbr;
-            if (_errors > MaxErrorsPerDay) IsStopped = true;
+            Errors = allErrors;
+            if (ForgetErrors)
+            {
+                ForgetErrors = false;
+                _levelAtForgetMoment = Errors;
+            }
+            IsStopped = Errors - _levelAtForgetMoment > MaxErrorsPerDay;
+        }
+
+        public void AddErrors(int newErrors)
+        {
+            Errors += newErrors;
         }
 
         public bool IsStopped { get; private set; }
-        public void Reset()
-        {
-            _errors = 0;
-            IsStopped = false;
-        }
         public void StartNewDay()
         {
-            _errors = 0;
+            _levelAtForgetMoment = 0;
+            Errors = 0;
+            ForgetErrors = false;
         }
-        public int Errors => _errors;
+        public int Errors { get; private set; }
     }
 }

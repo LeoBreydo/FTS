@@ -7,28 +7,28 @@ namespace CoreTypes
         /// <summary>
         /// Open (first bar quotation)
         /// </summary>
-        public double O { get; private set; }
+        public double O { get; }
         /// <summary>
         /// High (the highest bar quotation)
         /// </summary>
-        public double H { get; private set; }
+        public double H { get; }
         /// <summary>
         /// Low )the lowest bar quotation)
         /// </summary>
-        public double L { get; private set; }
+        public double L { get; }
         /// <summary>
         /// Close (last bar quotation)
         /// </summary>
-        public double C { get; private set; }
+        public double C { get; }
 
         /// <summary>
         /// Time of start the first one-minute bar used for building this bar
         /// </summary>
-        public DateTime Start { get; private set; }
+        public DateTime Start { get; }
         /// <summary>
         /// Time of end of the last one-minute bar used for building this bar
         /// </summary>
-        public DateTime End { get; private set; }
+        public DateTime End { get; }
         /// <summary>
         /// Time when bar was created
         /// </summary>
@@ -56,7 +56,7 @@ namespace CoreTypes
         }
 
         public static Bar operator +(Bar current, Bar5s next)
-            => new Bar(current.O, Math.Max(current.H, next.High), Math.Min(current.L, next.Low),
+            => new(current.O, Math.Max(current.H, next.High), Math.Min(current.L, next.Low),
                 next.Close, current.Start, next.BarOpenTime.AddSeconds(5));
 
         public string AsString(string symbolExchange, bool isNewContract) => 
@@ -71,7 +71,7 @@ namespace CoreTypes
         public string SymbolExchange { get; }
         public string ContractCode { get; private set; }
 
-        private bool _newContract = false;
+        private bool _newContract;
 
         public BarAggregator(XSecondsAggregationRules rule, string symbolExchange, int gapInMinutes = int.MaxValue)
         {
@@ -122,11 +122,13 @@ namespace CoreTypes
                 return new Tuple<Bar, string, bool>(completed, SymbolExchange, flag);
             }
         }
+
         /// <summary>
         /// returns aggregated bar if it will be finished by aggregating rules
         /// + SymbolExchange + isNewContract
         /// </summary>
         /// <param name="bar">new five-sec bar</param>
+        /// <param name="utcNow"></param>
         /// <returns>aggregated bar or null</returns>
         public Tuple<Bar,string, bool> ProcessBar(Bar5s bar, DateTime utcNow)
         {

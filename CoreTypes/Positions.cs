@@ -1,28 +1,23 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using static System.Math;
 
 namespace CoreTypes
 {
     public class CurrencyPosition
     {
-        public List<ExchangePosition> ExchangePositions { get; private set; } = new();
-        public decimal UnrealizedResult { get; private set; } = 0;
-        public decimal RealizedResult { get; private set; } = 0;
+        public List<ExchangePosition> ExchangePositions { get; } = new();
+        public decimal UnrealizedResult { get; private set; }
+        public decimal RealizedResult { get; private set; }
 
-        public CurrencyPosition()
-        {
-        }
-
-        public int Update(bool resetErrors)
+        public int Update(bool startNewDay)
         {
             UnrealizedResult = 0;
             RealizedResult = 0;
             var en = 0;
             foreach (var ep in ExchangePositions)
             {
-                en += ep.Update(resetErrors);
+                en += ep.Update(startNewDay);
                 UnrealizedResult += ep.UnrealizedResult;
                 RealizedResult += ep.RealizedResult;
             }
@@ -39,18 +34,18 @@ namespace CoreTypes
     public class ExchangePosition
     {
         public ExchangeTrader Owner;
-        public List<MarketPosition> MarketPositions { get; private set; } = new();
+        public List<MarketPosition> MarketPositions { get; } = new();
 
-        public decimal UnrealizedResult { get; private set; } = 0;
-        public decimal RealizedResult { get; private set; } = 0;
-        public int DealNbr { get; private set; } = 0;
+        public decimal UnrealizedResult { get; private set; }
+        public decimal RealizedResult { get; private set; }
+        public int DealNbr { get; private set; }
 
         public ExchangePosition(ExchangeTrader owner)
         {
             Owner = owner;
         }
 
-        public int Update(bool resetErrors)
+        public int Update(bool startNewDay)
         {
             UnrealizedResult = 0;
             RealizedResult = 0;
@@ -58,15 +53,13 @@ namespace CoreTypes
             var en = 0;
             foreach (var ip in MarketPositions)
             {
-                en = ip.Update(resetErrors);
+                en = ip.Update(startNewDay);
                 UnrealizedResult += ip.UnrealizedResult;
                 RealizedResult += ip.RealizedResult;
                 DealNbr += ip.DealNbr;
             }
-
-            Owner.ErrorCollector.Reset();
-            if (Owner.ErrorCollector.ForgetErrors) Owner.ErrorCollector.ForgetErrors = false;
-            else Owner.ErrorCollector.ApplyErrors(en);
+            Owner.ErrorCollector.SetErrorsAndEvaluateState(en);
+            if (startNewDay) Owner.ErrorCollector.StartNewDay();
             Owner.RestrictionsManager.SetErrorsNbrRestriction(Owner.ErrorCollector.IsStopped
                 ? TradingRestriction.HardStop
                 : TradingRestriction.NoRestrictions);
@@ -81,14 +74,14 @@ namespace CoreTypes
 
     public class MarketPosition
     {
-        public List<StrategyPosition> StrategyPositions { get; private set; } = new();
-        public MarketCriticalLossManager LossManager { get; private set; }
-        public int LongSize { get; private set; } = 0;
-        public int ShortSize { get; private set; } = 0;
+        public List<StrategyPosition> StrategyPositions { get; } = new();
+        public MarketCriticalLossManager LossManager { get; }
+        public int LongSize { get; private set; }
+        public int ShortSize { get; private set; }
         public int Size => LongSize + ShortSize;
-        public decimal UnrealizedResult { get; private set; } = 0;
-        public decimal RealizedResult { get; private set; } = 0;
-        public int DealNbr { get; private set; } = 0;
+        public decimal UnrealizedResult { get; private set; }
+        public decimal RealizedResult { get; private set; }
+        public int DealNbr { get; private set; }
 
         public PriceProvider PriceProvider { get; }
 
@@ -96,12 +89,12 @@ namespace CoreTypes
 
         public MarketPosition(MarketTrader owner, decimal criticalLoss = decimal.MinValue)
         {
-            LossManager = new MarketCriticalLossManager(this, criticalLoss);
+            LossManager = new MarketCriticalLossManager(criticalLoss);
             PriceProvider = new PriceProvider();
             _owner = owner;
         }
 
-        public int Update(bool resetErrors)
+        public int Update(bool startNewDay)
         {
             if (PriceProvider.LastPrice == -1) return 0;
             var currentPrice = PriceProvider.LastPrice;
@@ -111,7 +104,6 @@ namespace CoreTypes
             RealizedResult = 0;
             DealNbr = 0;
             LossManager.SessionResult = 0;
-            if (resetErrors) _owner.ErrorCollector.Reset();
             foreach (var sp in StrategyPositions)
             {
                 sp.UpdatePosition(currentPrice);
@@ -123,11 +115,8 @@ namespace CoreTypes
                 LossManager.SessionResult += sp.LossManager.SessionResult;
             }
             LossManager.UpdateState();
-            if (_owner.ErrorCollector.ForgetErrors)
-            {
-                _owner.ErrorCollector.ForgetErrors = false;
-                _owner.ErrorCollector.Reset();
-            }
+            _owner.ErrorCollector.SetErrorsAndEvaluateState(_owner.ErrorCollector.Errors);
+            if (startNewDay) _owner.ErrorCollector.StartNewDay();
             _owner.RestrictionsManager.SetErrorsNbrRestriction(_owner.ErrorCollector.IsStopped
                 ? TradingRestriction.HardStop
                 : TradingRestriction.NoRestrictions);
@@ -155,7 +144,7 @@ namespace CoreTypes
         private readonly List<(Execution, int, decimal)> _openDeals = new();
         private decimal _bpv;
 
-        public StrategyCriticalLossManager LossManager { get; private set; }
+        public StrategyCriticalLossManager LossManager { get; }
         public int Size { get; private set; }
         private decimal _refQuote = -1;
 
@@ -169,7 +158,7 @@ namespace CoreTypes
             : StrategyPositionStateEnum.Flat;
 
         public int DealNbr => _openDeals.Count;
-        public double WeightedOpenQuote { get; set; } = 0;
+        public double WeightedOpenQuote { get; set; }
 
         public StrategyTrader Owner { get; set; }
 

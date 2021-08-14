@@ -1,20 +1,16 @@
-﻿using System.Collections.Generic;
-
-namespace CoreTypes
+﻿namespace CoreTypes
 {
     public class MarketCriticalLossManager
     {
-        private readonly List<StrategyPosition> _strategyPositions;
-        public decimal CriticalLoss { get; private set; }
+        public decimal CriticalLoss { get; }
 
-        public MarketCriticalLossManager(MarketPosition instrumentPosition, decimal criticalLoss = decimal.MinValue)
+        public MarketCriticalLossManager(decimal criticalLoss = decimal.MinValue)
         {
-            _strategyPositions = instrumentPosition.StrategyPositions;
             CriticalLoss = criticalLoss;
         }
 
         public decimal SessionResult { get; set; } = 0;
-        public bool StoppedByCriticalLoss { get; private set; } = false;
+        public bool StoppedByCriticalLoss { get; private set; }
 
         public void UpdateState()
         {
@@ -25,7 +21,7 @@ namespace CoreTypes
     public class StrategyCriticalLossManager
     {
         private readonly StrategyPosition _strategyPosition;
-        private decimal _resultAtSessionStart = 0;
+        private decimal _resultAtSessionStart;
 
         public StrategyCriticalLossManager(StrategyPosition strategyPosition,
             decimal criticalLoss = decimal.MinValue)
@@ -38,7 +34,7 @@ namespace CoreTypes
 
         public decimal SessionResult { get; private set; }
 
-        public bool StoppedByCriticalLoss { get; private set; } = false;
+        public bool StoppedByCriticalLoss { get; private set; }
 
         public void UpdateState()
         {

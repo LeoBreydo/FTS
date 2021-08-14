@@ -1,18 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 
 namespace CoreTypes
 {
     public class ExchangeTrader : ICommandReceiver
     {
-        public int Id { get; private set; }
+        public int Id { get; }
         public string Exchange { get; }
         public string Currency { get; }
 
         #region structure
-        public Dictionary<string, MarketTrader> Markets { get; } = new();
+        public SortedList<string, MarketTrader> Markets { get; } = new();
 
         public void RegisterMarketTrader(MarketTrader mt)
         {
@@ -66,10 +65,10 @@ namespace CoreTypes
 
     public class MarketTrader : ICommandReceiver
     {
-        public int Id { get; private set; }
+        public int Id { get; }
         public string MarketCode { get; }
         public string ContractCode { get; set; } = string.Empty;
-        public string Exchange { get; private set; }
+        public string Exchange { get; }
         public readonly ContractDetailsManager ContractManager;
         public readonly ErrorCollector ErrorCollector;
 
@@ -199,7 +198,7 @@ namespace CoreTypes
                     s.CurrentOperationAmount = 0;
                 orderIdsToCancel.Add(key);
             }
-            ErrorCollector.ApplyErrors(orderIdsToCancel.Count);
+            ErrorCollector.AddErrors(orderIdsToCancel.Count);
             foreach (var key in orderIdsToCancel) PostedOrderMap.Remove(key);
             return orderIdsToCancel;
         }
@@ -213,13 +212,13 @@ namespace CoreTypes
 
     public class StrategyTrader : ICommandReceiver
     { 
-        public int Id { get; private set; }
-        public SignalService SignalService { get; private set; }
-        public StrategyPosition Position { get; private set; }
-        public int CurrentOperationAmount { get; set; } = 0;
-        public int ContractsNbr { get; private set; } = 1;
+        public int Id { get; }
+        public SignalService SignalService { get; }
+        public StrategyPosition Position { get; }
+        public int CurrentOperationAmount { get; set; }
+        public int ContractsNbr { get; }
 
-        public int OffsetDealAmount = 0; // mandatory execution!!
+        public int OffsetDealAmount; // mandatory execution!!
 
         private Signal _lastSignal;
         private readonly StrategyRestrictionsManager _restrictionsManager = new();
@@ -261,11 +260,11 @@ namespace CoreTypes
                     }
                 }
                     break;
-                case OrderForgetCommand forgetCommand:
+                case OrderForgetCommand:
                     break;
-                case OrderRepeatCommand repeatCommand:
+                case OrderRepeatCommand:
                     break;
-                case ManualFillCommand manualCommand:
+                case ManualFillCommand:
                     break;
             }
         }
@@ -281,7 +280,7 @@ namespace CoreTypes
         }
 
         // call when CurrentOperationAmount is zero
-        private void SetOrderSize(decimal currentQuotation)
+        private void SetOrderSize()
         {
             if (_lastSignal == Signal.TO_FLAT || _currentRestriction == TradingRestriction.HardStop)
             {
@@ -340,7 +339,7 @@ namespace CoreTypes
                 CurrentOperationAmount = -Position.Size;
                 return new StrategyOrderInfo(Id, CurrentOperationAmount);
             }
-            SetOrderSize(lastQuotations.last);
+            SetOrderSize();
             _lastSignal = Signal.NO_SIGNAL;
             if (CurrentOperationAmount != 0)
             {

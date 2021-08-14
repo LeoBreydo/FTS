@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection.Metadata;
-using System.Runtime.InteropServices;
 
 
 namespace CoreTypes
@@ -81,7 +79,7 @@ namespace CoreTypes
 
         private List<string> GetTicksInfo(DateTime utcNow) => 
             _priceProviderMap.Select(kvp => kvp.Value.AsString(utcNow, kvp.Key)).ToList();
-        private List<string> GetBarsInfo(List<Tuple<Bar, string, bool>> bars) => 
+        private static List<string> GetBarsInfo(List<Tuple<Bar, string, bool>> bars) => 
             bars.Select(t => t.Item1.AsString(t.Item2,t.Item3)).ToList();
 
         private void RegisterStrategyTrader(string exchangeName, string marketName, StrategyTrader st)
@@ -211,17 +209,20 @@ namespace CoreTypes
         }
         private void UpdateProfitLossInfos(StateObject so)
         {
-            var resetErrors = (so.CurrentUtcTime - _lastDayStart).TotalDays >= 1;
-            if (resetErrors) _lastDayStart = so.CurrentUtcTime;
-
-            var totalErrors = Positions.Aggregate(0, (current, kvp) => (int) (current + kvp.Value.Update(resetErrors)));
-            ErrorCollector.Reset();
-            if (ErrorCollector.ForgetErrors) ErrorCollector.ForgetErrors = false;
-            else ErrorCollector.ApplyErrors(totalErrors);
+            var startNeDay = (so.CurrentUtcTime - _lastDayStart).TotalDays >= 1;
+            var totalErrors = Positions.Aggregate(0, (current, kvp) => current + kvp.Value.Update(startNeDay));
+            ErrorCollector.SetErrorsAndEvaluateState(totalErrors);
+            if (startNeDay)
+            {
+                ErrorCollector.StartNewDay();
+                _lastDayStart = so.CurrentUtcTime;
+            }
             RestrictionManager.SetErrorsNbrRestriction(ErrorCollector.IsStopped
                 ? TradingRestriction.HardStop
                 : TradingRestriction.NoRestrictions);
         }
+
+        private readonly Random _rand = new (DateTime.Now.Millisecond);
         private LS ApplyOrderReports(StateObject so, out LSSS errorMessages)
         {
             static string ProcessUnknownReport(OrderStateMessage report)
@@ -256,7 +257,10 @@ namespace CoreTypes
                 if (!_reportsRoutingMap.ContainsKey(report.ClOrderId))
                 {
                     errorMessages.Add(("UNK","UNK",ProcessUnknownReport(report)));
-                    ErrorCollector.ApplyErrors(1);
+                    // select random marketTrader and apply error to it
+                    var ret = Exchanges.Values[_rand.Next(Exchanges.Count)];
+                    var rmt = ret.Markets.Values[_rand.Next(ret.Markets.Count)];
+                    rmt.ErrorCollector.AddErrors(1);
                 }
                 else
                 {
@@ -307,7 +311,7 @@ namespace CoreTypes
             List<Tuple<Bar, string, bool>> newBars = new();
             foreach (var b in so.BarUpdateList)
             {
-                var ret = _barAggregatorMap[b.SymbolExchange].ProcessBar(b, so.CurrentUtcTime);
+                var ret = _barAggregatorMap[b.SymbolExchange].ProcessBar(b, utcNow: so.CurrentUtcTime);
                 if (ret != null) newBars.Add(ret);
                 acc.Add(b.SymbolExchange);
             }
@@ -333,7 +337,7 @@ namespace CoreTypes
                 case CommandSource.User:
                     if(command is RestrictionCommand userCommand)
                         RestrictionManager.SetUserRestriction(userCommand.Restriction);
-                    else if (command is ErrorsForgetCommand errorsCommand)
+                    else if (command is ErrorsForgetCommand)
                         ErrorCollector.ForgetErrors = true;
                     break;
                 case CommandSource.Scheduler:

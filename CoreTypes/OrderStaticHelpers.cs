@@ -132,7 +132,6 @@ namespace CoreTypes
             DateTime utcNow, OrderStateMessage report, out string errorMessage)
         {
             errorMessage = null;
-            var clId = report.ClOrderId;
             (List<string> tlist, bool isOrderFinished) ret = report.MyType switch
             {
                 OrderStateMessageType.Cancel => Handle(owner, report, out errorMessage),
@@ -146,7 +145,7 @@ namespace CoreTypes
         private static (List<string> tlist, bool isOrderFinished) Handle(MarketTrader owner, 
             OrderStateMessage report, out string errorMessage)
         {
-            owner.ErrorCollector.ApplyErrors(1);
+            owner.ErrorCollector.AddErrors(1);
             errorMessage = null;
             var clOrdId = report.ClOrderId;
             if (owner.PostedOrderMap.ContainsKey(clOrdId))
@@ -174,14 +173,14 @@ namespace CoreTypes
             {
                 // unknown order detected
                 // 1) apply fill to first available strategy
-                if ((int) report.SgnQty != 0)
+                if (report.SgnQty != 0)
                 {
                     var t = MarketTrader.ApplyRealFill(owner.StrategyMap.First().Value, report);
                     if (t.Count > 0) trades.AddRange(t);
                     // 2) generate error message to client/log
                     errorMessage =
                         $"Execution error detected - unexpected operation for {owner.ContractCode} for {report.SgnQty} contracts was executed (order id is {report.OrderId}). Offset deal is auto-generated.";
-                    owner.ErrorCollector.ApplyErrors(1);
+                    owner.ErrorCollector.AddErrors(1);
                 }
 
                 // 3) mark order as executed
@@ -209,8 +208,8 @@ namespace CoreTypes
                 if (t.Count > 0) trades.AddRange(t);
                 // 2) generate error message to client/log
                 errorMessage =
-                    $"Execution error detected - no operation was expected for {owner.ContractCode}, but deal for {(int) report.SgnQty} contracts was executed (order id is {report.OrderId}). Offset deal is auto-generated.";
-                owner.ErrorCollector.ApplyErrors(1);
+                    $"Execution error detected - no operation was expected for {owner.ContractCode}, but deal for {report.SgnQty} contracts was executed (order id is {report.OrderId}). Offset deal is auto-generated.";
+                owner.ErrorCollector.AddErrors(1);
                 // 3) remove order from postedOrdersMap
                 owner.PostedOrderMap.Remove(clOrdId);
                 // 4) mark order as executed
@@ -229,7 +228,7 @@ namespace CoreTypes
                 //2)generate error message to client/log
                 errorMessage =
                     $"Execution error detected - buy/sell mismatch for {owner.ContractCode} (order id is {report.OrderId}). Offset deal is auto-generated.";
-                owner.ErrorCollector.ApplyErrors(1);
+                owner.ErrorCollector.AddErrors(1);
                 //3)cancel waiting orders at all others bindings 
                 var bcnt = bindings.Count;
                 for (var i = 1; i < bcnt; ++i) owner.StrategyMap[bindings[i].StrategyId].CurrentOperationAmount = 0;
@@ -258,7 +257,7 @@ namespace CoreTypes
                 //2)generate error message to client/log
                 errorMessage =
                     $"Execution error detected - order for {owner.ContractCode} is overfilled by {surplus}  contracts (order id is {report.OrderId}). Offset deal is auto-generated.";
-                owner.ErrorCollector.ApplyErrors(1);
+                owner.ErrorCollector.AddErrors(1);
                 //3)remove order from postedOrdersMap
                 owner.PostedOrderMap.Remove(clOrdId);
                 //4)mark order as executed

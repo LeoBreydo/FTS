@@ -36,22 +36,22 @@ namespace CoreTypes
             Exchange = cd.Contract.Exchange;
             LocalSymbol = cd.Contract.LocalSymbol;
             //yyyymmdd
-            ContractMonth = DateTime.ParseExact((string)cd.ContractMonth, "yyyyMM", CultureInfo.InvariantCulture);
+            ContractMonth = DateTime.ParseExact(cd.ContractMonth, "yyyyMM", CultureInfo.InvariantCulture);
             TimeZoneId = cd.TimeZoneId;
             //20180323:0930-20180323:1600; etc
             var parts = cd.LiquidHours.Split(";");
             var fst = parts[0].Split("-");
             (StartLiquidHours, EndLiquidHours) =
-                (DateTime.ParseExact((string)fst[0], "yyyyMMdd:HHmm", CultureInfo.InvariantCulture),
-                    DateTime.ParseExact((string)fst[1], "yyyyMMdd:HHmm", CultureInfo.InvariantCulture));
+                (DateTime.ParseExact(fst[0], "yyyyMMdd:HHmm", CultureInfo.InvariantCulture),
+                    DateTime.ParseExact(fst[1], "yyyyMMdd:HHmm", CultureInfo.InvariantCulture));
 
             //20210831
-            ExpirationDate = DateTime.ParseExact((string)cd.RealExpirationDate, "yyyyMMdd",
+            ExpirationDate = DateTime.ParseExact(cd.RealExpirationDate, "yyyyMMdd",
                 CultureInfo.InvariantCulture);
             parts = cd.LastTradeTime.Split(":");
-            var (h, m) = (int.Parse((string)parts[0]), int.Parse((string)parts[1]));
+            var (h, m) = (int.Parse(parts[0]), int.Parse(parts[1]));
             LastTradeTime = ExpirationDate.AddHours(h).AddMinutes(m);
-            Multiplier = int.Parse((string)cd.Contract.Multiplier);
+            Multiplier = int.Parse(cd.Contract.Multiplier);
             MinTick = cd.MinTick;
         }
 
