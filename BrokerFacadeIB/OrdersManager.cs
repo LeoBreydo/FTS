@@ -269,7 +269,7 @@ namespace BrokerFacadeIB
                 return;
 
             var contract = _symbolAndExchangeToContract[key];
-            var o = new IBApi.Order
+            var o = new Order
             {
                 Action = action,
                 OrderType = "MKT",

@@ -5,26 +5,15 @@ namespace BrokerFacadeIB
     // market data
     public abstract class MarketDataMessage
     {
-        protected int requestId;
-        protected int field;
-
         public MarketDataMessage(int requestId, int field)
         {
             RequestId = requestId;
             Field = field;
         }
 
-        public int RequestId
-        {
-            get { return requestId; }
-            set { requestId = value; }
-        }
+        public int RequestId { get; set; }
 
-        public int Field
-        {
-            get { return field; }
-            set { field = value; }
-        }
+        public int Field { get; set; }
     }
 
     public class TickPriceMessage : MarketDataMessage
@@ -126,10 +115,6 @@ namespace BrokerFacadeIB
 
     public class OpenOrderMessage : OrderMessage
     {
-        private Contract contract;
-        private Order order;
-        private OrderState orderState;
-
         public OpenOrderMessage(int orderId, Contract contract, Order order, OrderState orderState)
         {
             OrderId = orderId;
@@ -138,24 +123,11 @@ namespace BrokerFacadeIB
             OrderState = orderState;
         }
 
-        public Contract Contract
-        {
-            get { return contract; }
-            set { contract = value; }
-        }
+        public Contract Contract { get; set; }
 
-        public Order Order
-        {
-            get { return order; }
-            set { order = value; }
-        }
+        public Order Order { get; set; }
 
-        public OrderState OrderState
-        {
-            get { return orderState; }
-            set { orderState = value; }
-        }
-
+        public OrderState OrderState { get; set; }
     }
 
     // execution
@@ -232,10 +204,6 @@ namespace BrokerFacadeIB
 
     public class CompletedOrderMessage
     {
-        private Contract contract;
-        private Order order;
-        private OrderState orderState;
-
         public CompletedOrderMessage(Contract contract, Order order, OrderState orderState)
         {
             Contract = contract;
@@ -243,23 +211,11 @@ namespace BrokerFacadeIB
             OrderState = orderState;
         }
 
-        public Contract Contract
-        {
-            get { return contract; }
-            set { contract = value; }
-        }
+        public Contract Contract { get; set; }
 
-        public Order Order
-        {
-            get { return order; }
-            set { order = value; }
-        }
+        public Order Order { get; set; }
 
-        public OrderState OrderState
-        {
-            get { return orderState; }
-            set { orderState = value; }
-        }
+        public OrderState OrderState { get; set; }
     }
 
     public class TickByTickBidAskMessage

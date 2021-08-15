@@ -79,7 +79,6 @@ namespace CoreTypes
         public IValueTracker<decimal, WorkingState> LossManager { get; }
         public int LongSize { get; private set; }
         public int ShortSize { get; private set; }
-        public int Size => LongSize + ShortSize;
         public decimal UnrealizedResult { get; private set; }
         public decimal RealizedResult { get; private set; }
         public int DealNbr { get; private set; }
@@ -166,13 +165,6 @@ namespace CoreTypes
 
         public decimal UnrealizedResult { get; private set; }
         public decimal RealizedResult { get; private set; }
-        public decimal TotalResult => RealizedResult + UnrealizedResult;
-        public StrategyPositionStateEnum StrategyPositionState => Size > 0
-            ? StrategyPositionStateEnum.Long
-            : Size < 0
-            ? StrategyPositionStateEnum.Short
-            : StrategyPositionStateEnum.Flat;
-
         public int DealNbr => _openDeals.Count;
         public double WeightedOpenQuote { get; set; }
 

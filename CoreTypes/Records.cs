@@ -11,10 +11,6 @@ namespace CoreTypes
     }
     public record Trade(Execution Open, Execution Close, int Size, string StrategyName)
     {
-        public bool IsLong => Size > 0;
-        public decimal Result => Size * (Close.Price - Open.Price);
-        public TimeSpan Duration => Close.Time - Open.Time;
-
         public override string ToString()
         {
             return $"StrategyName: {StrategyName}, OpEx: {Open}, ClEx: {Close}, Size: {Size}";

@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace CoreTypes
 {
-    public enum TradingRestriction : int
+    public enum TradingRestriction
     {
         NoRestrictions = 0,
         SoftStop = 1,

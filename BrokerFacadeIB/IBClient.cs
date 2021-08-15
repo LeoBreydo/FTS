@@ -28,7 +28,7 @@ namespace BrokerFacadeIB
             if (_sc == null)
                 action();
             else
-                _sc.Post(t => action(), null);
+                _sc.Post(_ => action(), null);
         }
 
 

@@ -311,7 +311,7 @@ namespace CoreTypes
             if (stopLossPositionGuard == null) StopLossPositionGuard = new FakePositionGuard();
             else
             {
-                StopLossPositionGuard = stopLossPositionGuard as TakeProfitPositionGuard != null
+                StopLossPositionGuard = stopLossPositionGuard is TakeProfitPositionGuard
                                             ? new FakePositionGuard()
                                             : stopLossPositionGuard;
             }

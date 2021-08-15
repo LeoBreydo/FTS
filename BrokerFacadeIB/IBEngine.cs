@@ -152,7 +152,7 @@ namespace BrokerFacadeIB
 
             if (succeeded)
             {
-                cts?.Dispose();
+                cts.Dispose();
                 AddMessage("INFO","StartClient passed successfully");
                 return true;
             }
@@ -167,13 +167,13 @@ namespace BrokerFacadeIB
                 RestartTws();
                 try
                 {
-                    cts?.Cancel();
+                    cts.Cancel();
                 }
                 catch { }
             }
 
             Disconnection(SessionConnectionStatus.ConnectionLost, msg);
-            cts?.Dispose();
+            cts.Dispose();
             return false;
         }
 

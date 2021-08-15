@@ -223,7 +223,6 @@ namespace CoreTypes
         public bool SetValue(string name, string value)
         {
             var par = Parameters.First(p => p.Name == name);
-            if (par == null) return false;
             par.Value = value;
             return true;
         }
@@ -239,7 +238,7 @@ namespace CoreTypes
 
         public static StrategyParameters UpdateOldStyleValues(StrategyParameters sps)
         {
-            if (sps != null && sps.Parameters != null)
+            if (sps is {Parameters: { }})
             {
                 foreach (var p in sps.Parameters)
                 {
@@ -439,7 +438,7 @@ namespace CoreTypes
 
         public string Verify(List<int> IDs, List<string> strategyNames)
         {
-            if (Id < 0) return $"Id must be non-negative";
+            if (Id < 0) return "Id must be non-negative";
             if (IDs.Contains(Id)) return $"Id duplication detected - {Id}";
             IDs.Add(Id);
             if (string.IsNullOrWhiteSpace(StrategyName) || StrategyName == "UNK")

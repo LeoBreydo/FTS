@@ -36,7 +36,6 @@ namespace CoreTypes
                     LastSize = (int)ti.Value;
                     LastTime = dt;
                     break;
-                default: break;
             }
         }
 
