@@ -14,7 +14,7 @@ namespace CoreTypes
             TradingService ts)
         {
             MessagesToShow = messagesToShow;
-            DayErrorNbr = ts.ErrorCollector.Errors;
+            DayErrorNbr = ts.ErrorTracker.ValueForCurrentPeriod;
             Restrictions = ts.RestrictionManager.GetRestrictions();
             foreach (var (key, value) in ts.Positions)
                 CurrencyGroupStates.Add(new CurrencyGroupState(key, value));
@@ -44,7 +44,8 @@ namespace CoreTypes
         public decimal UnrealizedResult;
         public decimal RealizedResult;
         public string Restrictions;
-        public List<MarketState> MarketStates = new List<MarketState>();
+        public List<MarketState> MarketStates = new ();
+        public int DayErrorNbr;
 
         public ExchangeState(ExchangeTrader et)
         {
@@ -53,6 +54,7 @@ namespace CoreTypes
             UnrealizedResult = et.Position.UnrealizedResult;
             RealizedResult = et.Position.RealizedResult;
             Restrictions = et.RestrictionsManager.GetRestrictions();
+            DayErrorNbr = et.ErrorTracker.ValueForCurrentPeriod;
             foreach (var mt in et.Markets.Values) MarketStates.Add(new MarketState(mt));
         }
     }
@@ -69,6 +71,7 @@ namespace CoreTypes
         public decimal SessionResult;
         public string Restrictions;
         public List<StrategyState> StrategyStates = new();
+        public int DayErrorNbr;
 
         public MarketState(MarketTrader mt)
         {
@@ -79,8 +82,9 @@ namespace CoreTypes
             RealizedResult = mt.Position.RealizedResult;
             LongSize = mt.Position.LongSize;
             ShortSize = mt.Position.ShortSize;
-            SessionResult = mt.Position.LossManager.SessionResult;
+            SessionResult = mt.Position.LossManager.ValueForCurrentPeriod;
             Restrictions = mt.RestrictionsManager.GetRestrictions();
+            DayErrorNbr = mt.ErrorTracker.ValueForCurrentPeriod;
             foreach (var st in mt.StrategyMap.Values) StrategyStates.Add(new StrategyState(st));
         }
     }
@@ -100,7 +104,7 @@ namespace CoreTypes
             UnrealizedResult = st.Position.UnrealizedResult;
             RealizedResult = st.Position.RealizedResult;
             Size = st.Position.Size;
-            SessionResult = st.Position.LossManager.SessionResult;
+            SessionResult = st.Position.LossManager.ValueForCurrentPeriod;
             Restrictions = st.RestrictionsManager.GetRestrictions();
         }
     }

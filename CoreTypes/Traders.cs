@@ -24,7 +24,7 @@ namespace CoreTypes
         private TradingRestriction _currentRestriction;
         private readonly ExchangeRestrictionsManager _restrictionsManager = new();
         public ExchangeRestrictionsManager RestrictionsManager => _restrictionsManager;
-        public ErrorCollector ErrorCollector;
+        public IValueTracker<int, WorkingState> ErrorTracker { get; }
 
         public void ApplyCommand(ICommand command)
         {
@@ -37,7 +37,7 @@ namespace CoreTypes
                         _restrictionsManager.SetUserRestriction(restrictionCommand.Restriction);
                         break;
                     case ErrorsForgetCommand:
-                        ErrorCollector.ForgetErrors = true;
+                        ErrorTracker.ResetState();
                         break;
                 }
             }
@@ -59,7 +59,7 @@ namespace CoreTypes
             Currency = currency;
             Position = new ExchangePosition(this);
             _currentRestriction = _restrictionsManager.GetCurrentRestriction();
-            ErrorCollector = new ErrorCollector(maxErrorsPerDay);
+            ErrorTracker = new ErrorTracker(maxErrorsPerDay);
         }
     }
 
@@ -69,8 +69,8 @@ namespace CoreTypes
         public string MarketCode { get; }
         public string ContractCode { get; set; } = string.Empty;
         public string Exchange { get; }
-        public readonly ContractDetailsManager ContractManager;
-        public readonly ErrorCollector ErrorCollector;
+        public ContractDetailsManager ContractManager { get; }
+        public IValueTracker<int, WorkingState> ErrorTracker { get; }
 
         #region structure
         public Dictionary<int, StrategyTrader> StrategyMap { get; } = new();
@@ -95,7 +95,7 @@ namespace CoreTypes
                         RestrictionsManager.SetUserRestriction(restrictionCommand.Restriction);
                         break;
                     case ErrorsForgetCommand:
-                        ErrorCollector.ForgetErrors = true;
+                        ErrorTracker.ResetState();
                         break;
                 }
             }
@@ -103,10 +103,6 @@ namespace CoreTypes
         public void UpdateParentRestrictions(TradingRestriction parentRestriction)
         {
             RestrictionsManager.SetParentRestriction(parentRestriction);
-            RestrictionsManager.SetCriticalLossRestriction(
-                Position.LossManager.StoppedByCriticalLoss
-                    ? TradingRestriction.HardStop
-                    : TradingRestriction.NoRestrictions);
             _currentRestriction = RestrictionsManager.GetCurrentRestriction();
             foreach (var st in StrategyMap.Values) st.UpdateParentRestrictions(_currentRestriction);
         }
@@ -120,7 +116,7 @@ namespace CoreTypes
             Exchange = exchange;
             _currentRestriction = RestrictionsManager.GetCurrentRestriction();
             ContractManager = new(this);
-            ErrorCollector = new ErrorCollector(maxErrorsPerDay);
+            ErrorTracker = new ErrorTracker(maxErrorsPerDay);
         }
         public (MarketTrader, MarketOrderDescription order, List<string>) GenerateOrders(DateTime utcNow)
         {
@@ -198,7 +194,7 @@ namespace CoreTypes
                     s.CurrentOperationAmount = 0;
                 orderIdsToCancel.Add(key);
             }
-            ErrorCollector.AddErrors(orderIdsToCancel.Count);
+            ErrorTracker.ChangeValueBy(orderIdsToCancel.Count);
             foreach (var key in orderIdsToCancel) PostedOrderMap.Remove(key);
             return orderIdsToCancel;
         }
@@ -272,10 +268,6 @@ namespace CoreTypes
         public void UpdateParentRestrictions(TradingRestriction parentRestriction)
         {
             _restrictionsManager.SetParentRestriction(parentRestriction);
-            _restrictionsManager.SetCriticalLossRestriction(
-                Position.LossManager.StoppedByCriticalLoss
-                    ? TradingRestriction.HardStop
-                    : TradingRestriction.NoRestrictions);
             _currentRestriction = _restrictionsManager.GetCurrentRestriction();
         }
 

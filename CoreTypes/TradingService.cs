@@ -100,7 +100,7 @@ namespace CoreTypes
 
         private TradingRestriction _currentRestriction;
         public ServiceRestrictionsManager RestrictionManager { get; } = new();
-        public ErrorCollector ErrorCollector { get; }
+        public IValueTracker<int,WorkingState> ErrorTracker { get; }
         private DateTime _lastDayStart = DateTime.UtcNow.AddDays(-1);
 
         public TradingService(TradingConfiguration cfg, SignalService signalService)
@@ -108,7 +108,7 @@ namespace CoreTypes
             Id = cfg.Id;
             _currentRestriction = RestrictionManager.GetCurrentRestriction();
             CommandReceivers.Add(Id,this);
-            ErrorCollector = new ErrorCollector(cfg.MaxErrorsPerDay);
+            ErrorTracker = new ErrorTracker(cfg.MaxErrorsPerDay);
             foreach (var cet in cfg.Exchanges)
             {
                 var et = new ExchangeTrader(cet.Id, cet.ExchangeName, cet.Currency, cet.MaxErrorsPerDay);
@@ -211,18 +211,18 @@ namespace CoreTypes
         {
             var startNeDay = (so.CurrentUtcTime - _lastDayStart).TotalDays >= 1;
             var totalErrors = Positions.Aggregate(0, (current, kvp) => current + kvp.Value.Update(startNeDay));
-            ErrorCollector.SetErrorsAndEvaluateState(totalErrors);
+            ErrorTracker.SetExternalTrackingValue(totalErrors);
+            ErrorTracker.CalculateState();
             if (startNeDay)
             {
-                ErrorCollector.StartNewDay();
+                ErrorTracker.StartNewTrackingPeriod();
                 _lastDayStart = so.CurrentUtcTime;
             }
-            RestrictionManager.SetErrorsNbrRestriction(ErrorCollector.IsStopped
+            RestrictionManager.SetErrorsNbrRestriction(ErrorTracker.State == WorkingState.Stopped
                 ? TradingRestriction.HardStop
                 : TradingRestriction.NoRestrictions);
         }
 
-        private readonly Random _rand = new (DateTime.Now.Millisecond);
         private LS ApplyOrderReports(StateObject so, out LSSS errorMessages)
         {
             static string ProcessUnknownReport(OrderStateMessage report)
@@ -257,10 +257,7 @@ namespace CoreTypes
                 if (!_reportsRoutingMap.ContainsKey(report.ClOrderId))
                 {
                     errorMessages.Add(("UNK","UNK",ProcessUnknownReport(report)));
-                    // select random marketTrader and apply error to it
-                    var ret = Exchanges.Values[_rand.Next(Exchanges.Count)];
-                    var rmt = ret.Markets.Values[_rand.Next(ret.Markets.Count)];
-                    rmt.ErrorCollector.AddErrors(1);
+                    ErrorTracker.ChangeValueBy(1);
                 }
                 else
                 {
@@ -338,7 +335,7 @@ namespace CoreTypes
                     if(command is RestrictionCommand userCommand)
                         RestrictionManager.SetUserRestriction(userCommand.Restriction);
                     else if (command is ErrorsForgetCommand)
-                        ErrorCollector.ForgetErrors = true;
+                        ErrorTracker.ResetState();
                     break;
                 case CommandSource.Scheduler:
                     if (command is RestrictionCommand schedulerCommand)

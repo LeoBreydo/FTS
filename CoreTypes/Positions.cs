@@ -58,9 +58,10 @@ namespace CoreTypes
                 RealizedResult += ip.RealizedResult;
                 DealNbr += ip.DealNbr;
             }
-            Owner.ErrorCollector.SetErrorsAndEvaluateState(en);
-            if (startNewDay) Owner.ErrorCollector.StartNewDay();
-            Owner.RestrictionsManager.SetErrorsNbrRestriction(Owner.ErrorCollector.IsStopped
+            Owner.ErrorTracker.SetExternalTrackingValue(en);
+            Owner.ErrorTracker.CalculateState();
+            if (startNewDay) Owner.ErrorTracker.StartNewTrackingPeriod();
+            Owner.RestrictionsManager.SetErrorsNbrRestriction(Owner.ErrorTracker.State == WorkingState.Stopped
                 ? TradingRestriction.HardStop
                 : TradingRestriction.NoRestrictions);
             return en;
@@ -75,7 +76,7 @@ namespace CoreTypes
     public class MarketPosition
     {
         public List<StrategyPosition> StrategyPositions { get; } = new();
-        public MarketCriticalLossManager LossManager { get; }
+        public IValueTracker<decimal, WorkingState> LossManager { get; }
         public int LongSize { get; private set; }
         public int ShortSize { get; private set; }
         public int Size => LongSize + ShortSize;
@@ -86,10 +87,11 @@ namespace CoreTypes
         public PriceProvider PriceProvider { get; }
 
         private readonly MarketTrader _owner;
+        private bool _newSessionStarted;
 
         public MarketPosition(MarketTrader owner, decimal criticalLoss = decimal.MinValue)
         {
-            LossManager = new MarketCriticalLossManager(criticalLoss);
+            LossManager = new CriticalLossManager(criticalLoss);
             PriceProvider = new PriceProvider();
             _owner = owner;
         }
@@ -103,7 +105,6 @@ namespace CoreTypes
             UnrealizedResult = 0;
             RealizedResult = 0;
             DealNbr = 0;
-            LossManager.SessionResult = 0;
             foreach (var sp in StrategyPositions)
             {
                 sp.UpdatePosition(currentPrice);
@@ -112,20 +113,34 @@ namespace CoreTypes
                 UnrealizedResult += sp.UnrealizedResult;
                 RealizedResult += sp.RealizedResult;
                 DealNbr += sp.DealNbr;
-                LossManager.SessionResult += sp.LossManager.SessionResult;
             }
-            LossManager.UpdateState();
-            _owner.ErrorCollector.SetErrorsAndEvaluateState(_owner.ErrorCollector.Errors);
-            if (startNewDay) _owner.ErrorCollector.StartNewDay();
-            _owner.RestrictionsManager.SetErrorsNbrRestriction(_owner.ErrorCollector.IsStopped
+            LossManager.SetExternalTrackingValue(UnrealizedResult+RealizedResult);
+            LossManager.CalculateState();
+            if (_newSessionStarted)
+            {
+                LossManager.StartNewTrackingPeriod();
+                _newSessionStarted = false;
+            }
+            _owner.RestrictionsManager.SetCriticalLossRestriction(LossManager.State == WorkingState.Stopped
                 ? TradingRestriction.HardStop
                 : TradingRestriction.NoRestrictions);
-            return _owner.ErrorCollector.Errors;
+
+            _owner.ErrorTracker.CalculateState();
+            if (startNewDay) _owner.ErrorTracker.StartNewTrackingPeriod();
+            _owner.RestrictionsManager.SetErrorsNbrRestriction(_owner.ErrorTracker.State == WorkingState.Stopped
+                ? TradingRestriction.HardStop
+                : TradingRestriction.NoRestrictions);
+            return _owner.ErrorTracker.TotalValue;
         }
 
         public void RegisterStrategyPosition(StrategyTrader strategy)
         {
             StrategyPositions.Add(strategy.Position);
+        }
+
+        public void StartNewSession()
+        {
+            _newSessionStarted = true;
         }
     }
 
@@ -143,8 +158,9 @@ namespace CoreTypes
         // exec, size, last settlement price (initial -1)
         private readonly List<(Execution, int, decimal)> _openDeals = new();
         private decimal _bpv;
+        private bool _newSessionStarted;
 
-        public StrategyCriticalLossManager LossManager { get; }
+        public IValueTracker<decimal, WorkingState> LossManager { get; }
         public int Size { get; private set; }
         private decimal _refQuote = -1;
 
@@ -170,13 +186,23 @@ namespace CoreTypes
             StrategyId = strategyId;
             StrategyName = strategyName;
             _bpv = 1;
-            LossManager = new StrategyCriticalLossManager(this, criticalLoss);
+            LossManager = new CriticalLossManager(criticalLoss);
         }
 
         public void UpdatePosition(decimal currentPrice)
         {
             UnrealizedResult = (Size == 0 ? 0 : Size * (currentPrice - _refQuote)) * _bpv;
-            LossManager.UpdateState();
+            LossManager.SetNewValue(UnrealizedResult+RealizedResult);
+            LossManager.CalculateState();
+            if (_newSessionStarted)
+            {
+                LossManager.StartNewTrackingPeriod();
+                _newSessionStarted = false;
+            }
+            Owner.RestrictionsManager.SetCriticalLossRestriction(LossManager.State == WorkingState.Stopped
+                ? TradingRestriction.HardStop
+                : TradingRestriction.NoRestrictions);
+
         }
 
         public void ProcessSettlementPrice(decimal settlementPrice)
@@ -292,12 +318,14 @@ namespace CoreTypes
             return trades;
         }
 
-        public void StartNewSession() =>
-            LossManager.StartNewSession(RealizedResult + UnrealizedResult);
-
         public void SetBigPointValue(int bpv)
         {
             _bpv = bpv;
+        }
+
+        public void StartNewSession()
+        {
+            _newSessionStarted = true;
         }
     }
 }

@@ -94,6 +94,7 @@ namespace CoreTypes
                     }
                     case true when !outOfSessionAfter:
                     {
+                        _owner.Position.StartNewSession();
                         foreach (var s in _owner.StrategyMap.Values)
                             s.Position.StartNewSession();
                         break;

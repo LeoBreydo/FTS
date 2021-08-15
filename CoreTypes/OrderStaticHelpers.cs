@@ -145,7 +145,7 @@ namespace CoreTypes
         private static (List<string> tlist, bool isOrderFinished) Handle(MarketTrader owner, 
             OrderStateMessage report, out string errorMessage)
         {
-            owner.ErrorCollector.AddErrors(1);
+            owner.ErrorTracker.ChangeValueBy(1);
             errorMessage = null;
             var clOrdId = report.ClOrderId;
             if (owner.PostedOrderMap.ContainsKey(clOrdId))
@@ -180,7 +180,7 @@ namespace CoreTypes
                     // 2) generate error message to client/log
                     errorMessage =
                         $"Execution error detected - unexpected operation for {owner.ContractCode} for {report.SgnQty} contracts was executed (order id is {report.OrderId}). Offset deal is auto-generated.";
-                    owner.ErrorCollector.AddErrors(1);
+                    owner.ErrorTracker.ChangeValueBy(1);
                 }
 
                 // 3) mark order as executed
@@ -209,7 +209,7 @@ namespace CoreTypes
                 // 2) generate error message to client/log
                 errorMessage =
                     $"Execution error detected - no operation was expected for {owner.ContractCode}, but deal for {report.SgnQty} contracts was executed (order id is {report.OrderId}). Offset deal is auto-generated.";
-                owner.ErrorCollector.AddErrors(1);
+                owner.ErrorTracker.ChangeValueBy(1);
                 // 3) remove order from postedOrdersMap
                 owner.PostedOrderMap.Remove(clOrdId);
                 // 4) mark order as executed
@@ -228,7 +228,7 @@ namespace CoreTypes
                 //2)generate error message to client/log
                 errorMessage =
                     $"Execution error detected - buy/sell mismatch for {owner.ContractCode} (order id is {report.OrderId}). Offset deal is auto-generated.";
-                owner.ErrorCollector.AddErrors(1);
+                owner.ErrorTracker.ChangeValueBy(1);
                 //3)cancel waiting orders at all others bindings 
                 var bcnt = bindings.Count;
                 for (var i = 1; i < bcnt; ++i) owner.StrategyMap[bindings[i].StrategyId].CurrentOperationAmount = 0;
@@ -257,7 +257,7 @@ namespace CoreTypes
                 //2)generate error message to client/log
                 errorMessage =
                     $"Execution error detected - order for {owner.ContractCode} is overfilled by {surplus}  contracts (order id is {report.OrderId}). Offset deal is auto-generated.";
-                owner.ErrorCollector.AddErrors(1);
+                owner.ErrorTracker.ChangeValueBy(1);
                 //3)remove order from postedOrdersMap
                 owner.PostedOrderMap.Remove(clOrdId);
                 //4)mark order as executed
