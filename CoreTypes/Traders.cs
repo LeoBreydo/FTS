@@ -72,6 +72,9 @@ namespace CoreTypes
         public ContractDetailsManager ContractManager { get; }
         public IValueTracker<int, WorkingState> ErrorTracker { get; }
 
+        public int BigPointValue { get; set; }
+        public double MinMove { get; set; }
+
         #region structure
         public Dictionary<int, StrategyTrader> StrategyMap { get; } = new();
         public Dictionary<int, (List<StrategyOrderInfo>,DateTime)> PostedOrderMap { get; } = new();
@@ -79,6 +82,7 @@ namespace CoreTypes
         {
             StrategyMap.Add(st.Id, st);
             Position.RegisterStrategyPosition(st);
+            st.Position.SetBigPointValue(BigPointValue);
         }
         #endregion // structure
 
@@ -108,7 +112,8 @@ namespace CoreTypes
         }
         public MarketPosition Position { get; }
         // arguments must be correct
-        public MarketTrader(int id, string marketCode, string exchange, int maxErrorsPerDay, decimal criticalLoss)
+        public MarketTrader(int id, string marketCode, string exchange, int maxErrorsPerDay, 
+            decimal criticalLoss, int bpv, double minMove)
         {
             Id = id;
             Position = new MarketPosition(this, criticalLoss);
@@ -117,6 +122,8 @@ namespace CoreTypes
             _currentRestriction = RestrictionsManager.GetCurrentRestriction();
             ContractManager = new(this);
             ErrorTracker = new ErrorTracker(maxErrorsPerDay);
+            BigPointValue = bpv;
+            MinMove = minMove;
         }
         public (MarketTrader, MarketOrderDescription order, List<string>) GenerateOrders(DateTime utcNow)
         {
@@ -199,10 +206,25 @@ namespace CoreTypes
             return orderIdsToCancel;
         }
 
-        public void SetBigPointValue(int bpv)
+        public (int,double) UpdateMinMoveAndBPV(int bpv, double minMove)
         {
-            foreach (var st in StrategyMap.Values)
-                st.Position.SetBigPointValue(bpv);
+            int b = -1;
+            double mm = -1;
+            if (bpv != BigPointValue)
+            {
+                BigPointValue = bpv;
+                foreach (var st in StrategyMap.Values)
+                    st.Position.SetBigPointValue(bpv);
+                b = bpv;
+            }
+
+            if (Math.Abs(minMove - MinMove) > 1e-8)
+            {
+                MinMove = minMove;
+                mm = minMove;
+            }
+
+            return (b, mm);
         }
     }
 

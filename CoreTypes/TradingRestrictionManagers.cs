@@ -44,7 +44,7 @@ namespace CoreTypes
         public List<(CommandSource, TradingRestriction)> GetDetails() =>
             _restrictions
                 .Select((r, i) => ((CommandSource) i, r))
-                .Where(t => t.Item2 != TradingRestriction.NoRestrictions)
+                .Where(t => t.r != TradingRestriction.NoRestrictions)
                 .ToList();
 
         public string GetRestrictions()

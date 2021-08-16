@@ -172,8 +172,8 @@ namespace CoreTypes
         public int Id = -1;
         public string MarketName = "UNK";
         public string Exchange = "UNK";
-        public decimal BigPointValue = -1;
-        public decimal MinMove = -1;
+        public int BigPointValue = -1;
+        public double MinMove = -1;
         public decimal SessionCriticalLoss { get; set; } = decimal.MinValue;
         public int MaxErrorsPerDay = 0;
         public List<StrategyConfiguration> Strategies { get; set; } = new ();

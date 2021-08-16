@@ -23,7 +23,8 @@ namespace CoreTypes
         }
 
         private bool _toProcessNow ;
-        public (string markeCode, string exchange, string error) ProcessContractInfo(ContractInfo ci, DateTime utcNow)
+        public (string markeCode, string exchange, string error) ProcessContractInfo(ContractInfo ci, DateTime utcNow, 
+            List<(string mex, int bpv, double mm)> newBpvMms)
         {
             var err = string.Empty;
             var ret = (
@@ -35,7 +36,8 @@ namespace CoreTypes
             {
                 _toProcessNow = true;
                 _currentContract = ci;
-                _owner.SetBigPointValue(_currentContract.Multiplier);
+                var (b, mm) = _owner.UpdateMinMoveAndBPV(_currentContract.Multiplier, _currentContract.MinTick);
+                if(b > 0 || mm > 0) newBpvMms.Add((_owner.MarketCode+_owner.Exchange,b,mm));
                 _owner.ContractCode = ci.LocalSymbol;
                 if (!AdjustDateTimes())
                 {

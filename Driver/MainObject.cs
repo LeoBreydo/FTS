@@ -48,6 +48,19 @@ namespace Driver
             
             Logger.PostToLog(so.CurrentUtcTime, t.TicksInfo, t.BarsInfo, t.TradesInfo,
                 so.OrderStateMessageList, so.TextMessageList, t.Errors);
+
+            foreach (var bm in t.NewBpvMms)
+            {
+                if (bm.Item2 > 0)
+                {
+                    //update BigPointValue for bm.Item1
+                }
+
+                if (bm.Item3 > 0)
+                {
+                    //update MinMove for bm.Item1
+                }
+            }
         }
 
         public void Stop()

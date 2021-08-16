@@ -21,9 +21,10 @@ namespace CoreTypes
         public LS BarsInfo;
         public LS TradesInfo;
         public LSSS Errors;
+        public List<(string, int, double)> NewBpvMms;
 
         public OutInfo(LSS subscriptions, LMOD orders, TradingServiceState state,
-            LS ticksInfo, LS barsInfo, LS tradesInfo, LSSS errors)
+            LS ticksInfo, LS barsInfo, LS tradesInfo, LSSS errors, List<(string, int, double)> newBpvMms)
         {
             Subscriptions = subscriptions;
             Orders = orders;
@@ -32,6 +33,7 @@ namespace CoreTypes
             BarsInfo = barsInfo;
             TradesInfo = tradesInfo;
             Errors = errors;
+            NewBpvMms = newBpvMms;
         }
     }
     public class TradingService : ICommandReceiver
@@ -117,7 +119,7 @@ namespace CoreTypes
                 {
                     var mt = new MarketTrader(cmt.Id, cmt.MarketName,
                         cet.ExchangeName,cmt.MaxErrorsPerDay,
-                        cmt.SessionCriticalLoss);
+                        cmt.SessionCriticalLoss,cmt.BigPointValue, cmt.MinMove);
                     RegisterMarketTrader(cet.ExchangeName,mt);
                     foreach (var cst in cmt.Strategies)
                     {
@@ -161,7 +163,7 @@ namespace CoreTypes
             var newBars = MakeNewOneMinuteBars(so);
 
             // TODO inject new bars (and ticks?) to indicator container
-            var subscriptionList = ProcessContractInfos(so);
+            var subscriptionList = ProcessContractInfos(so, out var bm);
             var newTrades = ApplyOrderReports(so, out var errorMessages);
             
             UpdateProfitLossInfos(so);
@@ -177,7 +179,8 @@ namespace CoreTypes
                 ticksInfo: GetTicksInfo(so.CurrentUtcTime),
                 barsInfo: GetBarsInfo(newBars),
                 tradesInfo: newTrades,
-                errors: errorMessages
+                errors: errorMessages,
+                newBpvMms: bm
             );
         }
 
@@ -286,18 +289,20 @@ namespace CoreTypes
             }
             return newTrades;
         }
-        private LSS ProcessContractInfos(StateObject so)
+        private LSS ProcessContractInfos(StateObject so, out List<(string, int, double)>  nbml)
         {
+            List<(string, int, double)> bm = new ();
             LSSS subscriptionList = 
                 (from ci in so.ContractInfoList 
                     let key = ci.MarketName + ci.Exchange 
                     where _contractManagers.ContainsKey(key) 
-                    select _contractManagers[key].ProcessContractInfo(ci, so.CurrentUtcTime) 
+                    select _contractManagers[key].ProcessContractInfo(ci, so.CurrentUtcTime, bm) 
                     into res
                     select res).ToList();
-            subscriptionList.AddRange(_contractManagers.Values.Select(cm => cm.ProcessContractInfo(null, so.CurrentUtcTime)));
+            subscriptionList.AddRange(_contractManagers.Values.Select(cm => cm.ProcessContractInfo(null, so.CurrentUtcTime, bm)));
             foreach (var (_,_,txt) in subscriptionList.Where(t => t.txt != string.Empty))
                 so.TextMessageList.Add(new Tuple<string, string>("SubscriptionError", txt));
+            nbml = bm;
             return subscriptionList.Where(t=>t.market != string.Empty && t.txt == string.Empty)
                 .Select(t=> (t.market, t.exchange))
                 .ToList();
