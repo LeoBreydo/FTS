@@ -12,6 +12,8 @@ namespace BrokerFacadeIB
 {
     public class IBEngine
     {
+        public enum SessionConnectionStatus { ByUser, ByCounterParty, ConnectionLost, StoppedByIBEngine }
+
         private readonly EReaderMonitorSignal signal = new();
         private readonly IBClient _client;
 

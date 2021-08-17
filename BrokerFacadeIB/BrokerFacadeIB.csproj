@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
@@ -7,13 +7,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CoreTypes\CoreTypes.csproj" />
-    <ProjectReference Include="..\Messages\Messages.csproj" />
     <ProjectReference Include="..\Utilities\Utilities.csproj" />
   </ItemGroup>
 
   <ItemGroup>
     <Reference Include="CSharpAPI">
-      <HintPath>bin\Debug\net5.0\ref\CSharpAPI.dll</HintPath>
+      <HintPath>..\External\CSharpAPI.dll</HintPath>
     </Reference>
   </ItemGroup>
 
