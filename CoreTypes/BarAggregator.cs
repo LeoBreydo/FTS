@@ -58,9 +58,6 @@ namespace CoreTypes
         public static Bar operator +(Bar current, Bar5s next)
             => new(current.O, Math.Max(current.H, next.High), Math.Min(current.L, next.Low),
                 next.Close, current.Start, next.BarOpenTime.AddSeconds(5));
-
-        public string AsString(string symbolExchange, bool isNewContract) => 
-            $"SymbolExchange: {symbolExchange}, O: {O}, H: {H}, L: {L}, C: {C}, Start: {Start:yyyyMMdd:HHmmss}, End: {End:yyyyMMdd:HHmmss}, NewContract: {isNewContract}";
     }
     public class BarAggregator
     {

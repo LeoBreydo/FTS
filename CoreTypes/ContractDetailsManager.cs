@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using TimeZoneConverter;
 
 namespace CoreTypes
@@ -14,6 +15,17 @@ namespace CoreTypes
         {
             _lastReqDateTime = DateTime.UtcNow.AddHours(-24);
             _owner = owner;
+        }
+
+        public bool IsReadyToBeStopped
+        {
+            get
+            {
+                if (_owner.StrategyMap.Values
+                    .All(st => st.CurrentOperationAmount == 0 && st.OffsetDealAmount == 0 && st.Position.Size == 0))
+                    return _owner.PostedOrderMap.Count == 0;
+                return false;
+            }
         }
 
         private bool IsOutOfSession()

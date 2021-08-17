@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Threading.Tasks;
+using static CoreTypes.MessageStringProducer;
 
 namespace CoreTypes
 {
@@ -95,8 +96,8 @@ namespace CoreTypes
             foreach(var item in newBars) _barList.Add(item);
             foreach(var item in newTrades) _tradeList.Add(item);
             foreach(var item in orderStateMessageList) _orderStateMessages.Add(item.ToString());
-            foreach(var (item1, item2) in textMessageList) _msgList.Add($"{dt} {item1} : {item2}");
-            foreach (var (item1, item2, item3) in errorMessages) _errorsList.Add($"{dt} {item1} {item2} : {item3}");
+            foreach(var (tag, body) in textMessageList) _msgList.Add($"{dt} {tag} : {body}");
+            foreach (var (mkt, exch, txt) in errorMessages) _errorsList.Add($"{dt} {mkt} {exch} : {txt}");
 
             if ((utcNow - _lastSaveTime).TotalMinutes >= _saveEveryNthMinute)
             {
@@ -114,33 +115,41 @@ namespace CoreTypes
                     var cnt = _tiList.Count;
                     var consumed = 0;
                     if (cnt > 0)
+                    { sw.WriteLine(PriceProviderStringFormat);
                         foreach (var ti in _tiList.GetConsumingEnumerable())
                         {
                             sw.WriteLine(ti);
                             if (++consumed == cnt) break;
                         }
+                    }
                 }
                 using (var sw = File.AppendText(_pathPrefix + ".bars.txt"))
                 {
                     var cnt = _barList.Count;
                     var consumed = 0;
                     if (cnt > 0)
+                    {
+                        sw.WriteLine(BarInfoStringFormat);
                         foreach (var b in _barList.GetConsumingEnumerable())
                         {
                             sw.WriteLine(b);
                             if (++consumed == cnt) break;
                         }
+                    }
                 }
                 using (var sw = new StreamWriter(_pathPrefix + ".trades.txt"))
                 {
                     var cnt = _tradeList.Count;
                     var consumed = 0;
                     if (cnt > 0)
+                    {
+                        sw.WriteLine(TradeStringFormat);
                         foreach (var t in _tradeList.GetConsumingEnumerable())
                         {
                             sw.WriteLine(t);
                             if (++consumed == cnt) break;
                         }
+                    }
                 }
                 using (var sw = new StreamWriter(_pathPrefix + ".reports.txt"))
                 {

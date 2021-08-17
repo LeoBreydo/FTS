@@ -13,6 +13,8 @@ namespace Driver
         public Scheduler Scheduler { get; }  
         public InfoLogger Logger { get; }
         public SignalService SignalService { get; }
+
+        private bool _stoppedByHost = false;
         
         public MainObject()
         {
@@ -63,10 +65,11 @@ namespace Driver
             }
         }
 
-        public void Stop()
+        public bool IsReadyToBeStooped => _stoppedByHost && TService.IsReadyToBeStopped;
+
+        public void PlaceStopRequest()
         {
-            Facade.Stop();
-            Logger.Flush();
+            _stoppedByHost = true;
         } 
     }
 }

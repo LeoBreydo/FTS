@@ -7,7 +7,6 @@ using System.Diagnostics;
 using System.Threading;
 using CoreTypes;
 using IBApi;
-using Messages;
 
 namespace BrokerFacadeIB
 {

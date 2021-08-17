@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using static CoreTypes.MessageStringProducer;
 
 
 namespace CoreTypes
@@ -80,9 +81,9 @@ namespace CoreTypes
         }
 
         private List<string> GetTicksInfo(DateTime utcNow) => 
-            _priceProviderMap.Select(kvp => kvp.Value.AsString(utcNow, kvp.Key)).ToList();
+            _priceProviderMap.Select(kvp => PriceProviderString(kvp.Value,utcNow, kvp.Key)).ToList();
         private static List<string> GetBarsInfo(List<Tuple<Bar, string, bool>> bars) => 
-            bars.Select(t => t.Item1.AsString(t.Item2,t.Item3)).ToList();
+            bars.Select(t => BarInfoString(t.Item1,t.Item2,t.Item3)).ToList();
 
         private void RegisterStrategyTrader(string exchangeName, string marketName, StrategyTrader st)
         {
@@ -154,6 +155,9 @@ namespace CoreTypes
                 }
             }
         }
+
+        public bool IsReadyToBeStopped => _contractManagers.All(kvp => kvp.Value.IsReadyToBeStopped);
+
         public OutInfo ProcessCurrentState(StateObject so, LC clCmdList, LC schCmdList)
         {
             if (clCmdList?.Count > 0) ApplyCommands(clCmdList);

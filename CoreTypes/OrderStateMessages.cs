@@ -37,7 +37,7 @@ namespace CoreTypes
         public override int OrderId { get; }
 
         public override string ToString() => 
-            $"Time: {UtcNow:yyyyMMdd:HHmmss}, CancelReason: {CancelReason}, OId: {OrderId}, ClientOId: {ClOrderId}";
+            $"Cancel: Time: {UtcNow:yyyyMMdd:HHmmss}, CancelReason: {CancelReason}, OId: {OrderId}, ClientOId: {ClOrderId}";
     }
 
     public class OrderPostMessage : OrderStateMessage
@@ -60,7 +60,7 @@ namespace CoreTypes
         public override int OrderId { get; }
 
         public override string ToString() => 
-            $"Time: {UtcNow:yyyyMMdd:HHmmss}, Mkt: {Symbol}, Exch: {Exchange}, ContCode: {ContractCode},  SgnQty: {SgnQty}, OId: {OrderId}, ClientOId: {ClOrderId}";
+            $"Post: Time: {UtcNow:yyyyMMdd:HHmmss}, Mkt: {Symbol}, Exch: {Exchange}, ContCode: {ContractCode},  SgnQty: {SgnQty}, OId: {OrderId}, ClientOId: {ClOrderId}";
     }
 
     public class OrderExecutionMessage : OrderStateMessage
@@ -92,7 +92,7 @@ namespace CoreTypes
         public override OrderStateMessageType MyType { get; } = OrderStateMessageType.Execution;
         public override int OrderId { get; }
         public override string ToString() => 
-            $"Time: {TransactTime:yyyyMMdd:HHmmss}, Mkt{Symbol}, Exch: {Exchange}, ContCode: {ContractCode},  SgnQty: {SgnQty}, Price: {Price}, ExecId: {ExecId}, OId: {OrderId}, ClientOId: {ClOrderId}";
+            $"Exec: Time: {TransactTime:yyyyMMdd:HHmmss}, Mkt{Symbol}, Exch: {Exchange}, ContCode: {ContractCode},  SgnQty: {SgnQty}, Price: {Price}, ExecId: {ExecId}, OId: {OrderId}, ClientOId: {ClOrderId}";
     }
 
     

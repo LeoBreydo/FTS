@@ -34,11 +34,20 @@ namespace Driver
                         {
                             if (cts.Token.IsCancellationRequested)
                             {
-                                Console.WriteLine("Throwed");
-                                // verify all positions are closed!!
-                                mo.Stop();
-                                Thread.Sleep(5000);
-                                throw new TaskCanceledException("Request to stop");
+                                //Console.WriteLine("Throwed");
+                                mo.PlaceStopRequest();
+                                var elapsedSeconds = 0;
+                                while (!mo.IsReadyToBeStooped)
+                                {
+                                    if (elapsedSeconds >= 120) break;
+                                    Thread.Sleep(5000);
+                                    elapsedSeconds += 5;
+                                }
+                                mo.Facade.Stop();
+                                mo.Logger.Flush();
+                                if(elapsedSeconds < 120)
+                                    throw new TaskCanceledException("System will be stopped properly.");
+                                throw new TaskCanceledException("System can be stopped properly, it will be stopped anyway.");
                             }
 
                             var dt = DateTime.UtcNow;

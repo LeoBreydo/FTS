@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using static System.Math;
+using static CoreTypes.MessageStringProducer;
 
 namespace CoreTypes
 {
@@ -262,7 +263,7 @@ namespace CoreTypes
                             {
                                 case 0 when newDealRemainder == 0:
                                     // opened deal and new deal are reduced the both
-                                    trades.Add(new Trade(ee, e, ss, StrategyName).ToString());
+                                    trades.Add(TradeString(ee, e, ss, StrategyName));
                                     RealizedResult += _bpv * (p == -1
                                         ? (e.Price - ee.Price) * ss
                                         : (e.Price - p) * ss);
@@ -270,7 +271,7 @@ namespace CoreTypes
                                     break;
                                 case 0:
                                     // opened deal is reduced
-                                    trades.Add(new Trade(ee, e, ss, StrategyName).ToString());
+                                    trades.Add(TradeString(ee, e, ss, StrategyName));
                                     RealizedResult += _bpv * (p == -1
                                         ? (e.Price - ee.Price) * ss
                                         : (e.Price - p) * ss);
@@ -278,7 +279,7 @@ namespace CoreTypes
                                     break;
                                 default:
                                     // new deal is reduced
-                                    trades.Add(new Trade(ee, e, cnt, StrategyName).ToString());
+                                    trades.Add(TradeString(ee, e, cnt, StrategyName));
                                     RealizedResult += _bpv * (p == -1
                                         ? (e.Price - ee.Price) * cnt
                                         : (e.Price - p) * cnt);
