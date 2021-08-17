@@ -1,207 +1,346 @@
-﻿#if disabled // unable to launch TWS application from windows service
-using System;
-using System.Diagnostics;
+﻿using System;
 using System.IO;
+using System.Diagnostics;
 using System.Linq;
-using BrokerInterfaces;
-using Messages;
-using ProductInterfaces;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace BrokerFacadeIB
 {
-    /// <summary>
-    /// Warning! Do not use this class with trading service called as Windows Service, WindowsService is not able to start properly the GUI applications! 
-    /// Instead of that please use  class IBEngineActivator in join with standalone utility Tws_Activator (this solution/UtilApps/Activator).
-    /// This utility is started from HostServiceManager together with TS and stopped from Tws_Activator itself by timeout when TS is switched off.
-    /// </summary>
-    public class TwsActivator : ISecondPulseRoutine
+    public class TwsActivator
     {
-        private readonly string _app;
+        //private const int MAX_ATTEMPTS__TO_START = 3;
+        private const int LIMIT_IN_SEC__FOR_MAINWNDTITLE__When_Initializing = 60;
+        private const int NUM_SEC__Wait_While_ProcessLost = 60;
+
+        private readonly string _location;
         private readonly string _login;
         private readonly string _password;
-        private readonly IIBEngine _engine;
-        private readonly IMsgChannel _logChannel;
 
-        enum EStates
+        public TwsActivator(IBCredentials credentials, Action<string, string> actionAddMessage)
         {
-            Inactive, TWSStarting, TWSStarted, RestartTws, EngineStarted, RestartEngine
-        }
-
-        private EStates _state;
-        private long _counter;
-
-        private Process _twsProcess;
-        private bool IsTwsExited()
-        {
-            if (_twsProcess == null) return true;
-            if (_twsProcess.HasExited)
+            if (!File.Exists(credentials.Location))
             {
-                _twsProcess = null;
-                return true;
+                throw new ArgumentException("TWS Application not found: " + credentials.Location, nameof(credentials.Location));
             }
 
-            return false;
+            _location = credentials.Location;
+            _login = credentials.Login;
+            _password = credentials.Password;
+
+            InitLogout(actionAddMessage);
+            DebugLog("=====================");
         }
 
-        public TwsActivator(string pathToApplication,string login,string password,IIBEngine engine, IBrokerFacadeChannels brokerFacadeChannels)
+
+        private Action<string, string> _actionAddMessage = (_, _) => { };
+        private void InitLogout(Action<string, string> actionAddMessage)
         {
-            _app = pathToApplication;
-            _login = login;
-            _password = password;
-            _engine = engine;
-            _logChannel = brokerFacadeChannels.LogChannel;
-
-            if (!File.Exists(_app))
-                throw new Exception("Invalid path to application 'Trader Workstation'");
-
-            _state = EStates.Inactive;
+            if (actionAddMessage == null)
+                _actionAddMessage = (_, _) => { };
+            else
+                _actionAddMessage = actionAddMessage;
+        }
+        private void Logout(string txt, bool sendMessageToUser)
+        {
+            _actionAddMessage("TwsActivator", txt);
+            if (sendMessageToUser)
+                _actionAddMessage("CLIENT", txt);
         }
 
-        public void Start() { }
+        private static readonly object _Lock_LogFile = new object();
+        public static void DebugLog(string txt)
+        {
+#if DEBUG
+            lock (_Lock_LogFile)
+            {
+                File.AppendAllText("Logout.txt",
+                    DateTime.UtcNow.ToString("yyyyMMdd-HH:mm:ss.fff ") + txt + "\r\n");
+            }
+#endif
+        }
+
+
+        public void Start()
+        {
+            if (!IsStarted)
+                StartTask();
+        }
         public void Stop()
         {
-            if (_engine.IsStarted)
-                _engine.Stop();
-
-            if (_twsProcess != null && !_twsProcess.HasExited)
-            {
-                _twsProcess.CloseMainWindow();
-                _twsProcess = null;
-            }
-            SetState(EStates.Inactive);
+            _cancellationTokenSource?.Cancel();
+            _twsProcess?.CloseMainWindow();
         }
 
+        public void Restart()
+        {
+            if (!IsStarted)
+                StartTask();
+            else
+                KillAllTwsProcesses();
 
-        public void Call()
+        }
+        public bool IsStarted => _cancellationTokenSource != null;
+        public bool IsReady => _state == State.Working;
+
+
+        enum State { Inactive, Starting, Working, ProcessLost }
+        private CancellationTokenSource _cancellationTokenSource;
+
+        private State _state;
+        private Process _twsProcess;
+
+        //private int _attemptsToStart;
+        //private int _backCounter;
+        private int _counter;
+        private string _lastTitle;
+        private void StartTask()
+        {
+            SetState(State.Inactive);
+            _cancellationTokenSource = new CancellationTokenSource();
+            Task.Factory.StartNew((_) =>
+            {
+                try
+                {
+                    DebugLog("Started");
+                    while (!_cancellationTokenSource.Token.IsCancellationRequested)
+                    {
+//#if DEBUG
+//                        if (_twsProcess != null)
+//                            DebugLog("title:" + _twsProcess.GetMainWindowTitle());
+//#endif
+                        SecondPulse();
+                        Thread.Sleep(1000);
+                    }
+                }
+                catch (Exception e)
+                {
+                    DebugLog("Failed " + e);
+                }
+                finally
+                {
+                    _cancellationTokenSource.Dispose();
+                    _cancellationTokenSource = null;
+                    SetState(State.Inactive);
+                    DebugLog("Finished");
+
+                }
+
+            }, TaskCreationOptions.LongRunning
+                , _cancellationTokenSource.Token);
+        }
+
+        private void SecondPulse()
         {
             switch (_state)
             {
-                case EStates.Inactive:
-                    FindOrStartTWS(true);
+                case State.Inactive:
+                    Process_InactiveState();
                     break;
-
-                case EStates.TWSStarting:
-                    if (--_counter <= 0)
-                        SetState(IsTwsExited() ? EStates.RestartTws : EStates.TWSStarted);
+                case State.Starting:
+                    Process_StartingState();
                     break;
-
-                case EStates.RestartTws:
-                    if (--_counter <= 0)
-                        FindOrStartTWS(false);
+                case State.ProcessLost:
+                    Process_ProcessLostState();
                     break;
-
-                case EStates.TWSStarted:
-                    if (IsTwsExited())
-                        SetState(EStates.RestartTws);
-                    else
-                    {
-                        if (_engine.Start())
-                            SetState(EStates.EngineStarted);
-                        else
-                            Stop();
-                    }
+                case State.Working:
+                    Process_WorkingState();
                     break;
-
-                case EStates.EngineStarted:
-                    if (_engine.IsStarted)
-                        _engine.SecondPulse();
-                    else 
-                        OnEngineStopped();
-                    break;
-
-                case EStates.RestartEngine:
-                    if (IsTwsExited())
-                        SetState(EStates.RestartTws);
-                    else if (--_counter <= 0)
-                    {
-                        if (_engine.Start())
-                            SetState(EStates.EngineStarted);
-                        else
-                            SetState(EStates.RestartEngine);
-                    }
-                    break;
-
-               
             }
         }
-        private void OnEngineStopped()
+
+        private void SetState(State state)
         {
-            if (IsTwsExited())
-                SetState(EStates.RestartTws);
-            else
-                SetState(EStates.RestartEngine);
-        }
-        private void SetState(EStates newState)
-        {
-            _state = newState;
-            _logChannel.Publish(new TextMessage(TextMessageTypes.Info, "TwsActivator: state = "+ _state));
-            switch (newState)
+            _state = state;
+            
+            DebugLog("State " + state);
+            switch (_state)
             {
-                case EStates.TWSStarting:
-                    _counter = 45; // nbr of second to let application to complete instantiation
+                //case State.Inactive:
+                //    break;
+                case State.Working:
+                    //_attemptsToStart = 0;
                     break;
-                case EStates.RestartTws:
-                    _counter = 60; // nbr of second before restart TWS
+
+                case State.ProcessLost:
+                    Init_ProcessLostState();
                     break;
-                case EStates.RestartEngine:
-                    _counter = 60; // nbr of second before restart engine
-                    break;
-                default:
-                    _counter = 0;
+
+                case State.Starting:
+                    Init_StartingState();
                     break;
             }
         }
-        private void FindOrStartTWS(bool fromInactiveState)
+        private void Process_InactiveState()
         {
-            Process proc = Process.GetProcessesByName("tws").FirstOrDefault();
-            if (proc == null || proc.HasExited)
-            {
-                _logChannel.Publish(new TextMessage(TextMessageTypes.Debug, "TWS: Starting"));
-                StartTws(fromInactiveState);
-            }
+            if (AttachToWorkingTws())
+                SetState(State.Working);
             else
             {
-                _logChannel.Publish(new TextMessage(TextMessageTypes.Debug,
-                    "TWS: working app detected: " + proc.MainWindowTitle));
-                _twsProcess = proc;
-                SetState(EStates.TWSStarted);
+                LaunchTws();
             }
         }
 
-        private void StartTws(bool fromInactiveState)
+        private void Init_StartingState()
         {
+            _counter = 0;
+            _lastTitle = ""; // any impossible title
+        }
+
+        private void Process_StartingState()
+        {
+            UpdateTwsProcess();
+            if (_twsProcess==null) return;
+            
+            var title = _twsProcess.GetMainWindowTitle();
+            if (title != _lastTitle)
+            {
+                _lastTitle = title;
+                DebugLog("Title changed to: "+ _lastTitle);
+                _counter = 0;
+                return;
+            }
+
+            ++_counter;
+            if (_lastTitle.IndexOf("Interactive Brokers", StringComparison.OrdinalIgnoreCase) >= 0 && _counter >= 5)
+            {
+                SetState(State.Working);
+                return;
+            }
+
+            if (_counter >= LIMIT_IN_SEC__FOR_MAINWNDTITLE__When_Initializing) // if initialization hangs at any stage 
+            {
+                _twsProcess.TryKillProcess();
+                Logout(string.Format("TWS hangs detected at initialization stage (title='{0}')", _lastTitle), true);
+                SetState(State.Inactive);
+
+                //++_attemptsToStart;
+                // this limitation is removed: a network problem will lead to such failure but in this case attempts should be continued by default until explicit user command
+                //if (_attemptsToStart >= MAX_ATTEMPTS__TO_START)
+                //{
+                //    Logout(string.Format("TWS Activator stopped after {0} attempts to start TWS!!!", _attemptsToStart),  true);
+                //    Stop();
+                //}
+            }
+        }
+
+        private void Init_ProcessLostState()
+        {
+            _counter = 0;
+        }
+
+        private void Process_ProcessLostState()
+        {
+            Process[] processes = Process.GetProcessesByName("tws");
+            if (processes.Length == 1)
+            {
+                _twsProcess = processes[0];
+                SetState(State.Starting);
+                return;
+            }
+
+            ++_counter;
+            if (_counter >= NUM_SEC__Wait_While_ProcessLost)
+            {
+                foreach (var proc in processes)
+                    proc.TryKillProcess();
+                LaunchTws();
+            }
+
+        }
+
+        private void Process_WorkingState()
+        {
+            UpdateTwsProcess(); // if app is lost then toggle to Inactive state
+        }
+
+
+
+        private bool AttachToWorkingTws()
+        {
+            _twsProcess = FindSingleTwsProcess();
+            if (_twsProcess != null) return true;
+
+            KillAllTwsProcesses();
+            return false;
+        }
+        private static Process FindSingleTwsProcess()
+        {
+            Process[] processes = Process.GetProcessesByName("tws");
+            if (processes.Length == 0) return null;
+
+            Process workingProc =
+                processes.FirstOrDefault(proc =>
+                    proc.GetMainWindowTitle().IndexOf("Interactive Brokers", StringComparison.OrdinalIgnoreCase) >= 0);
+            if (workingProc == null) return null;
+
+            if (processes.Length > 1)
+            {
+                foreach (var proc in processes)
+                {
+                    if (proc != workingProc)
+                        proc.TryKillProcess();
+                }
+            }
+            return workingProc;
+        }
+
+
+        private void LaunchTws()
+        {
+            DebugLog("LaunchTws");
             try
             {
+                //var clientInfo = new { ClientLocation = _location, Login = _login, Password = _password };
                 var startInfo =
-                    new ProcessStartInfo(_app, string.Format("username={0} password={1}", _login, _password))
+                    new ProcessStartInfo(_location,
+                        string.Format("username={0} password={1}", _login, _password))
                     {
-                        WorkingDirectory = Path.GetDirectoryName(_app)
+                        WorkingDirectory = Path.GetDirectoryName(_location)
                     };
+
                 _twsProcess = new Process
                 {
                     StartInfo = startInfo
                 };
-                ;
-                if (!_twsProcess.Start())
-                {
-                    _logChannel.Publish(new TextMessage(TextMessageTypes.ALARM,
-                        "Cannot start Trader Workstation"));
-                    Stop();
-                }
 
-
-        }
+                _twsProcess.Start();
+                SetState(State.Starting);
+            }
             catch (Exception e)
             {
-                _logChannel.Publish(new TextMessage(TextMessageTypes.ALARM,
-                    "Failed to start Trader Workstation, exception: " + e));
-                if (fromInactiveState)
-                    Stop();
-                else
-                    SetState(EStates.RestartTws);
+                Logout("Failed to start TWS!!! : " + e, true);
+                SetState(State.Inactive);
+                Stop();
             }
-            SetState(EStates.TWSStarting);
         }
+
+        private static void KillAllTwsProcesses()
+        {
+            foreach (var proc in Process.GetProcessesByName("tws"))
+                proc.TryKillProcess();
+        }
+        private void UpdateTwsProcess()
+        {
+            if (_twsProcess == null) return;
+
+            try
+            {
+                //_twsProcess = _twsProcess.HasExited ? null : Process.GetProcessById(_twsProcess.Id);
+                if (_twsProcess.HasExited)
+                    _twsProcess = null;
+            }
+            catch
+            {
+                _twsProcess = null;
+            }
+
+            if (_twsProcess == null)
+            {
+                // Logout("TwsActivator: TWS application is lost", false); // todo this notification should be sent from state ProcessLost after the timeout?nope
+                SetState(State.ProcessLost);
+            }
+        }
+
     }
 }
-#endif

@@ -16,9 +16,9 @@ namespace Driver
 
         private bool _stoppedByHost = false;
         
-        public MainObject()
+        public MainObject(IBCredentials credentials)
         {
-            Facade = new IBBrokerFacade(new IBEngine());
+            Facade = new IBBrokerFacade(credentials);
             
             // composition root:
             // 1) currencies/markets/indicators/strategies

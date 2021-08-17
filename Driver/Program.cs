@@ -1,6 +1,9 @@
 ﻿using System;
+using System.Diagnostics;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using BrokerFacadeIB;
 
 namespace Driver
 {
@@ -8,6 +11,8 @@ namespace Driver
     {
         static void Main(string[] args)
         {
+            ReadIBCredentials();
+
             var cancellationTokenSource = new CancellationTokenSource();
             var t = MainLoop(cancellationTokenSource);
 
@@ -17,14 +22,55 @@ namespace Driver
             t.Wait();
             Console.WriteLine("To exit hit any key");
             Console.ReadKey();
+        }
 
+        private static IBCredentials _ibCredentials;
+        static void ReadIBCredentials()
+        {
+            const string Credentials_FileName = "IbCredentials.xml";
+            _ibCredentials = IBCredentials.Restore(Credentials_FileName);
+            if (_ibCredentials == null)
+            {
+                string login = ReadNotEmptyLine("Enter TWS login:");
+                string pwd = ReadNotEmptyLine("Password:");
+                string path = @"C:\Jts\tws.exe";
+                if (!File.Exists(path))
+                {
+                    Console.WriteLine($"TWS application not found by default location '{path}'");
+                    path = ReadNotEmptyLine("Enter full path to Tws application",
+                        pt =>
+                        {
+                            if (!string.IsNullOrEmpty(pt) && File.Exists(pt) &&
+                                string.Equals(Path.GetExtension(pt), ".exe", StringComparison.OrdinalIgnoreCase))
+                                return true;
+
+                            Console.WriteLine("Invalid path");
+                            return false;
+                        });
+                }
+
+                _ibCredentials = new IBCredentials {Login = login, Password = pwd, Location = path};
+                _ibCredentials.Save(Credentials_FileName);
+            }
+        }
+
+        static string ReadNotEmptyLine(string prompt,Func<string,bool> check=null)
+        {
+            if (check == null)
+                check = arg => !string.IsNullOrEmpty(arg);
+            while (true)
+            {
+                Console.Write(prompt);
+                string ret = Console.ReadLine();
+                if (check(ret)) return ret;
+            }
         }
 
         private static Task MainLoop(CancellationTokenSource cts)
         {
             return Task.Factory.StartNew((_) =>
                 {
-                    var mo = new MainObject();
+                    var mo = new MainObject(_ibCredentials);
                     Thread.Sleep(1000);
                     Console.WriteLine("Started?");
                     var ms = (int)Math.Floor(DateTime.UtcNow.TimeOfDay.TotalMilliseconds);

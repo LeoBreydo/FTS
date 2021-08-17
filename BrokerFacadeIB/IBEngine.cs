@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.IO;
-using System.Reflection;
-using System.Diagnostics;
 using System.Threading;
 using CoreTypes;
 using IBApi;
@@ -20,12 +17,13 @@ namespace BrokerFacadeIB
         private readonly int _port;
         private readonly string _host;
         private readonly int _clientId = 1;
+        public TwsActivator TwsActivator { get; }
 
         private OrdersManager OrderFeed { get; }
         private DataManager DataFeed { get; }
 
         private Thread _listenerThread;
-        private CancellationTokenSource lcts;
+        private CancellationTokenSource _lcts;
 
         private readonly BlockingCollection<Tuple<string, string>> _textMsgQueue = new();
         public void AddMessage(string tag, string message)
@@ -33,10 +31,11 @@ namespace BrokerFacadeIB
             _textMsgQueue.Add(new Tuple<string, string>(tag,message));
         }
 
-        public IBEngine(string hostname= "127.0.0.1", int port=7497)
+        public IBEngine(IBCredentials credentials)
         {
-            _port = port;
-            _host = hostname;
+            _port = credentials.Port;
+            _host = credentials.Hostname;
+            TwsActivator = new TwsActivator(credentials, AddMessage);
 
             _client = new IBClient(signal)
             {
@@ -92,89 +91,69 @@ namespace BrokerFacadeIB
         }
         public bool IsStarted { get; private set; }
         private bool _subscriptionError;
-        
+
         public bool Start()
         {
             if (IsStarted)
             {
                 AddMessage("INFO", "Attempt to start of the already working client was detected. No action was performed.");
-                AddMessage("CLIENT","Attempt to start of the already working client was detected");
+                AddMessage("CLIENT", "Attempt to start of the already working client was detected");
                 return false;
             }
 
-            AddMessage("INFO","Start");
+            AddMessage("INFO", "Start");
             IsStarted = true;
 
-            string err = null;
-            var succeeded = false;
-            CancellationTokenSource cts = new ();
-            var token = cts.Token;
-            lcts = new CancellationTokenSource();
-            var ltoken = lcts.Token;
+            string errmsg = null;
+            var suceeded = false;
 
-            var thr=new Thread(() =>
+            _lcts = new CancellationTokenSource();
+            var ltcs = _lcts;
+
+            try
             {
-                try
+                AddMessage("INFO", "Run Client");
+
+                // wait 10 seconds for any farmConnection notification
+                _anyNotification_received = false;
+                _farmConnectionNtf_restWaitSeconds = 60;
+
+                _client.ClientSocket.eConnect(_host, _port, _clientId);
+                var reader = new EReader(_client.ClientSocket, signal);
+                reader.Start();
+
+                _listenerThread = new Thread(() =>
                 {
-                    AddMessage("INFO","Run Client");
-
-                    // wait 10 seconds for any farmConnection notification
-                    _anyNotification_received = false;
-                    _farmConnectionNtf_restWaitSeconds = 60;
-
-                    _client.ClientSocket.eConnect(_host, _port, _clientId);
-                    var reader = new EReader(_client.ClientSocket, signal);
-                    reader.Start();
-
-                    _listenerThread = new Thread(() =>
+                    while (_client.ClientSocket.IsConnected())
                     {
-                        while (_client.ClientSocket.IsConnected())
-                        {
-                            signal.waitForSignal();
-                            reader.processMsgs();
-                            if (ltoken.IsCancellationRequested)
-                                ltoken.ThrowIfCancellationRequested();
-                        }
-                    }) {IsBackground = true};
-                    _listenerThread.Start();
+                        signal.waitForSignal();
+                        reader.processMsgs();
+                        if (ltcs.Token.IsCancellationRequested)
+                            break;
+                    }
 
-                    succeeded = true;
-                }
-                catch (Exception exception)
-                {
-                    err= "StartClient failed by exception: " + exception.Message;
-                }
+                    ltcs.Dispose();
 
-                if (token.IsCancellationRequested)
-                    token.ThrowIfCancellationRequested();
-            }){IsBackground = true};
-            thr.Start();
-            thr.Join(10000);
+                })
+                { IsBackground = true };
+                _listenerThread.Start();
 
-            if (succeeded)
+                suceeded = true;
+            }
+            catch (Exception exception)
             {
-                cts.Dispose();
-                AddMessage("INFO","StartClient passed successfully");
+                errmsg = "StartClient failed by exception: " + exception.Message;
+            }
+
+            if (suceeded)
+            {
+                AddMessage("INFO", "StartClient passed successfully");
                 return true;
             }
-            
-            string msg = err ?? "IB Client HANGS at the establish connection API call";
 
-            AddMessage("INFO",msg);
-            AddMessage("CLIENT",msg);
-
-            if (err == null)
-            {
-                RestartTws();
-                try
-                {
-                    cts.Cancel();
-                }
-                catch { }
-            }
-
-            Disconnection(SessionConnectionStatus.ConnectionLost, msg);
-            cts.Dispose();
+            AddMessage("INFO", errmsg);
+            AddMessage("CLIENT", errmsg);
+            Disconnection(SessionConnectionStatus.ConnectionLost, errmsg);
             return false;
         }
 
@@ -277,7 +256,7 @@ namespace BrokerFacadeIB
             {
                 if (thread != null)
                 {
-                    lcts?.Cancel();
+                    _lcts?.Cancel();
                     thread.Join();
                 }
             }
@@ -294,7 +273,7 @@ namespace BrokerFacadeIB
 
             SendDisconnectionMessages(disconnectionReason, disconnectionDetails);
            AddMessage("INFO","Stopped by reason " + disconnectionReason);
-           lcts?.Dispose();
+           _lcts?.Dispose();
         }
 
         public void SecondPulse()
@@ -339,46 +318,9 @@ namespace BrokerFacadeIB
             if (IsConnectionEstablished)
                 OrderFeed.SecondPulse();
         }
-        private string GetLocationOfTwsActivator()
-        {
-            try
-            {
-                var location = Assembly.GetAssembly(typeof(IBEngine))?.Location;
-                if (string.IsNullOrEmpty(location)) return null;
-                var ret = Path.GetFullPath(Path.Combine(Path.GetDirectoryName(location) 
-                                                        ?? string.Empty, "./TWS_Activator.exe"));
-                if (File.Exists(ret)) return ret;
-
-                AddMessage("INFO","Tws_Activator not found by path: " + ret);
-                return null;
-            }
-            catch (Exception excp)
-            {
-                AddMessage("INFO","Failed to get Location of TsActivator: " + excp);
-                return null;
-            }
-        }
         public void RestartTws()
         {
-            string pathToTwsActivator = GetLocationOfTwsActivator();
-            if (pathToTwsActivator == null)
-            {
-                AddMessage("INFO","Failed to RestartTwsProcesses path To Tws_Activator not found");
-                AddMessage("CLIENT", "TWS restart needed. PLEASE RESTART TWS MANUALLY, TWS activator not found");
-                return;
-            }
-
-            // send notification to TwsActivator
-            File.WriteAllText(pathToTwsActivator + ".RESTART", DateTime.UtcNow.ToString("yyyyMMdd-HH:mm:ss.fff") + " TradingServer requested to restart TWS");
-
-            bool activatorIsWorking = Process.GetProcessesByName("tws_activator").Length > 0;
-            AddMessage("INFO","RestartTwsProcesses, Tws_Activator process is " +
-                        (activatorIsWorking ? "working" : "NOT working"));
-
-            AddMessage("CLIENT",
-                activatorIsWorking
-                    ? "TWS restart needed. Request is sent to Tws_Activator to restart TWS"
-                    : "TWS restart needed. PLEASE RESTART TWS MANUALLY, Tws_Activator is not working");
+            TwsActivator.Restart();
         }
     }
 }
