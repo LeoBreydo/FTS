@@ -12,6 +12,7 @@ namespace BrokerFacadeIB
 
         public string Hostname = "127.0.0.1";
         public int Port = 7497;
+        public int ClientId = 1;
 
         private static readonly XmlSerializer serializer = new XmlSerializer(typeof(IBCredentials));
         public static IBCredentials Restore(string fileName)

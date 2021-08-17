@@ -94,7 +94,8 @@ namespace CoreTypes
             var dt = $"{utcNow:yyyyMMdd:HHmmss}";
             foreach(var item in tickInfoList)_tiList.Add(item);
             foreach(var item in newBars) _barList.Add(item);
-            foreach(var item in newTrades) _tradeList.Add(item);
+            if (newTrades!=null)
+                foreach (var item in newTrades) _tradeList.Add(item);
             foreach(var item in orderStateMessageList) _orderStateMessages.Add(item.ToString());
             foreach(var (tag, body) in textMessageList) _msgList.Add($"{dt} {tag} : {body}");
             foreach (var (mkt, exch, txt) in errorMessages) _errorsList.Add($"{dt} {mkt} {exch} : {txt}");

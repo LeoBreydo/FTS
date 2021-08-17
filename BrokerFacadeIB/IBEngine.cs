@@ -9,14 +9,14 @@ namespace BrokerFacadeIB
 {
     public class IBEngine
     {
-        public enum SessionConnectionStatus { ByUser, ByCounterParty, ConnectionLost, StoppedByIBEngine }
+        public enum SessionConnectionStatus { ByUser, ByCounterParty, ConnectionLost, StoppedByIBEngine }//todo to remove this enum, to use plain text instead of
 
         private readonly EReaderMonitorSignal signal = new();
         private readonly IBClient _client;
 
         private readonly int _port;
         private readonly string _host;
-        private readonly int _clientId = 1;
+        private readonly int _clientId;
         public TwsActivator TwsActivator { get; }
 
         private OrdersManager OrderFeed { get; }
@@ -35,6 +35,7 @@ namespace BrokerFacadeIB
         {
             _port = credentials.Port;
             _host = credentials.Hostname;
+            _clientId = credentials.ClientId;
             TwsActivator = new TwsActivator(credentials, AddMessage);
 
             _client = new IBClient(signal)

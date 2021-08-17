@@ -11,8 +11,6 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CoreTypes", "CoreTypes\Core
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Driver", "Driver\Driver.csproj", "{680708D2-2AFB-4402-A3D2-25CFE19FA94A}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "TWS_Activator", "TWS_Activator\TWS_Activator.csproj", "{79E0D025-89DA-4968-B677-99771A3ADFDD}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,10 +33,6 @@ Global
 		{680708D2-2AFB-4402-A3D2-25CFE19FA94A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{680708D2-2AFB-4402-A3D2-25CFE19FA94A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{680708D2-2AFB-4402-A3D2-25CFE19FA94A}.Release|Any CPU.Build.0 = Release|Any CPU
-		{79E0D025-89DA-4968-B677-99771A3ADFDD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{79E0D025-89DA-4968-B677-99771A3ADFDD}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{79E0D025-89DA-4968-B677-99771A3ADFDD}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{79E0D025-89DA-4968-B677-99771A3ADFDD}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
