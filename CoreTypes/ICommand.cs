@@ -97,7 +97,8 @@ namespace CoreTypes
         EndOfContract = 4,
         EndOfSession = 5,
         Error = 6,
-        ErrorsNbr = 7
+        ErrorsNbr = 7,
+        OutOfMarket = 8
     }
     public static class RSourceEx
     {
@@ -116,6 +117,7 @@ namespace CoreTypes
                 CommandSource.EndOfContract => "EndOfContract",
                 CommandSource.EndOfSession => "EndOfSession",
                 CommandSource.Error => "Error",
+                CommandSource.OutOfMarket => "OutOfMarket",
                 _ => "ErrorsNbr"
             };
         }

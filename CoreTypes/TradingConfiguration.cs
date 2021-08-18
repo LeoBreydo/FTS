@@ -194,7 +194,10 @@ namespace CoreTypes
             if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
             if (BigPointValue <= 0) return "BigPointValue must be positive";
             if (MinMove <= 0) return "MinMove must be positive";
-            if (Strategies == null || Strategies.Count == 0) return "Strategies are undefined";
+            // We CAN have the situation where there are no strategies traded a given market.
+            // it's true if a given market used just for indicator calculation.
+            // So, condition 'Strategy.Count == 0' is removed.
+            if (Strategies == null) return "Strategies are undefined"; 
             var idx = 0;
             foreach (var errString in Strategies.Select(sc => sc.Verify(IDs, strategyNames)))
             {

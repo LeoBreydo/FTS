@@ -44,7 +44,8 @@ namespace Driver
 
             var clientCmdList = Client.GetCommands();
             var schedulerCmdList = Scheduler.GetCommands();
-            var t = TService.ProcessCurrentState(so, clientCmdList, schedulerCmdList);
+            var icCommands = SignalService.GetCommands();
+            var t = TService.ProcessCurrentState(so, clientCmdList, schedulerCmdList, icCommands);
             Facade.PlaceRequest(t.Subscriptions, t.Orders);
             Client.PushInfo(t.State);
             
@@ -63,6 +64,8 @@ namespace Driver
                     //update MinMove for bm.Item1
                 }
             }
+
+            SignalService.ApplyNewMarketRestrictions(t.Commands);
         }
 
         public bool IsReadyToBeStooped => _stoppedByHost && TService.IsReadyToBeStopped;

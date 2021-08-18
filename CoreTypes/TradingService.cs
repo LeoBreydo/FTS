@@ -23,9 +23,11 @@ namespace CoreTypes
         public LS TradesInfo;
         public LSSS Errors;
         public List<(string, int, double)> NewBpvMms;
+        public List<(string, TradingRestriction)> Commands; //<market><exchange> -> new restriction
 
         public OutInfo(LSS subscriptions, LMOD orders, TradingServiceState state,
-            LS ticksInfo, LS barsInfo, LS tradesInfo, LSSS errors, List<(string, int, double)> newBpvMms)
+            LS ticksInfo, LS barsInfo, LS tradesInfo, LSSS errors, List<(string, int, double)> newBpvMms,
+            List<(string, TradingRestriction)> commands)
         {
             Subscriptions = subscriptions;
             Orders = orders;
@@ -35,6 +37,7 @@ namespace CoreTypes
             TradesInfo = tradesInfo;
             Errors = errors;
             NewBpvMms = newBpvMms;
+            Commands = commands;
         }
     }
     public class TradingService : ICommandReceiver
@@ -158,16 +161,17 @@ namespace CoreTypes
 
         public bool IsReadyToBeStopped => _contractManagers.All(kvp => kvp.Value.IsReadyToBeStopped);
 
-        public OutInfo ProcessCurrentState(StateObject so, LC clCmdList, LC schCmdList)
+        public OutInfo ProcessCurrentState(StateObject so, LC clCmdList, LC schCmdList, LC icCommands)
         {
             if (clCmdList?.Count > 0) ApplyCommands(clCmdList);
             if (schCmdList?.Count > 0) ApplyCommands(schCmdList);
+            if(icCommands?.Count > 0) ApplyCommands(icCommands);
 
             ApplyNewTicks(so);
             var newBars = MakeNewOneMinuteBars(so);
 
             // TODO inject new bars (and ticks?) to indicator container
-            var subscriptionList = ProcessContractInfos(so, out var bm);
+            var subscriptionList = ProcessContractInfos(so, out var bm, out var commands);
             var newTrades = ApplyOrderReports(so, out var errorMessages);
             
             UpdateProfitLossInfos(so);
@@ -184,7 +188,8 @@ namespace CoreTypes
                 barsInfo: GetBarsInfo(newBars),
                 tradesInfo: newTrades,
                 errors: errorMessages,
-                newBpvMms: bm
+                newBpvMms: bm,
+                commands: commands
             );
         }
 
@@ -293,22 +298,30 @@ namespace CoreTypes
             }
             return newTrades;
         }
-        private LSS ProcessContractInfos(StateObject so, out List<(string, int, double)>  nbml)
+        private LSS ProcessContractInfos(StateObject so, out List<(string, int, double)>  nbml, 
+            out List<(string,TradingRestriction)> commands)
         {
             List<(string, int, double)> bm = new ();
-            LSSS subscriptionList = 
-                (from ci in so.ContractInfoList 
-                    let key = ci.MarketName + ci.Exchange 
-                    where _contractManagers.ContainsKey(key) 
-                    select _contractManagers[key].ProcessContractInfo(ci, so.CurrentUtcTime, bm) 
+            var errList =
+                (from ci in so.ContractInfoList
+                    let key = ci.MarketName + ci.Exchange
+                    where _contractManagers.ContainsKey(key)
+                    select _contractManagers[key].SetNewContractInfo(ci, bm)
                     into res
                     select res).ToList();
-            subscriptionList.AddRange(_contractManagers.Values.Select(cm => cm.ProcessContractInfo(null, so.CurrentUtcTime, bm)));
-            foreach (var (_,_,txt) in subscriptionList.Where(t => t.txt != string.Empty))
-                so.TextMessageList.Add(new Tuple<string, string>("SubscriptionError", txt));
+
+            var subscriptionList = _contractManagers.Values
+                .Select(cm => cm.ProcessContractInfo(null, so.CurrentUtcTime, bm)).ToList();
+            commands = subscriptionList
+                .Where(t => t.command != 0)
+                .Select(t => (t.markeCode + t.exchange, t.command < 0 ? TradingRestriction.NoRestrictions : TradingRestriction.HardStop))
+                .ToList();
+            foreach (var error in errList.Where(t => t != string.Empty))
+                so.TextMessageList.Add(new Tuple<string, string>("SubscriptionError", error));
             nbml = bm;
-            return subscriptionList.Where(t=>t.market != string.Empty && t.txt == string.Empty)
-                .Select(t=> (t.market, t.exchange))
+
+            return subscriptionList.Where(t=>t.markeCode != string.Empty)
+                .Select(t=> (t.markeCode, t.exchange))
                 .ToList();
         }
         private List<Tuple<Bar, string, bool>> MakeNewOneMinuteBars(StateObject so)

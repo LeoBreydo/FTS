@@ -275,6 +275,9 @@ namespace CoreTypes
                         case CommandSource.Scheduler:
                             _restrictionsManager.SetSchedulerRestriction(r);
                             break;
+                        case CommandSource.OutOfMarket:
+                            _restrictionsManager.SetOutOfMarketRestriction(r);
+                            break;
                     }
                 }
                     break;

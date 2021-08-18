@@ -25,6 +25,8 @@ namespace CoreTypes
         public string TimeZoneId { get; set; }
         public DateTime StartLiquidHours { get; set; }
         public DateTime EndLiquidHours { get; set; }
+        public DateTime OpenMarket { get; set; }
+        public DateTime CloseMarket { get; set; }
         public DateTime ExpirationDate { get; }
         public DateTime LastTradeTime { get; set; }
         public int Multiplier { get; }
@@ -44,7 +46,11 @@ namespace CoreTypes
             (StartLiquidHours, EndLiquidHours) =
                 (DateTime.ParseExact(fst[0], "yyyyMMdd:HHmm", CultureInfo.InvariantCulture),
                     DateTime.ParseExact(fst[1], "yyyyMMdd:HHmm", CultureInfo.InvariantCulture));
-
+            parts = cd.TradingHours.Split(";");
+            fst = parts[0].Split("-");
+            (OpenMarket,CloseMarket) =
+                (DateTime.ParseExact(fst[0], "yyyyMMdd:HHmm", CultureInfo.InvariantCulture),
+                    DateTime.ParseExact(fst[1], "yyyyMMdd:HHmm", CultureInfo.InvariantCulture));
             //20210831
             ExpirationDate = DateTime.ParseExact(cd.RealExpirationDate, "yyyyMMdd",
                 CultureInfo.InvariantCulture);

@@ -105,6 +105,9 @@ namespace CoreTypes
 
         public void SetErrorsNbrRestriction(TradingRestriction r) =>
             SetRestriction(r, CommandSource.ErrorsNbr);
+
+        public void SetOutOfMarketRestriction(TradingRestriction r) =>
+            SetRestriction(r, CommandSource.OutOfMarket);
     }
 
     public class StrategyRestrictionsManager : TradingRestrictionManager
@@ -123,5 +126,8 @@ namespace CoreTypes
 
         public void SetErrorRestriction(TradingRestriction r) =>
             SetRestriction(r, CommandSource.Error);
+
+        public void SetOutOfMarketRestriction(TradingRestriction r) =>
+            SetRestriction(r, CommandSource.OutOfMarket);
     }
 }
