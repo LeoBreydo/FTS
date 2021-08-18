@@ -101,7 +101,7 @@ namespace CoreTypes
 
     public class TradingConfiguration
     {
-        public int Id=-1;
+        public int Id = -1;
         public DateTime StartedAt { get; set; }
         public int NextId { get; set; }
         public GeneralSettings GeneralSettings { get; set; } = new();
@@ -125,7 +125,7 @@ namespace CoreTypes
             if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
 
             var idx = 0;
-            foreach (var errString in Exchanges.Select(cgc => cgc.Verify(IDs,strategyNames,exchanges, currencies, mktExs)))
+            foreach (var errString in Exchanges.Select(cgc => cgc.Verify(IDs, strategyNames, exchanges, currencies, mktExs)))
             {
                 if (errString != null) return $"Exchange configuration at index {idx} : {errString}";
                 ++idx;
@@ -133,7 +133,6 @@ namespace CoreTypes
 
             return null;
         }
-
         private static readonly XmlSerializer serializer = new XmlSerializer(typeof(TradingConfiguration));
         public static TradingConfiguration Restore(string fileName)
         {
@@ -170,7 +169,6 @@ namespace CoreTypes
             {
                 return exception.Message;
             }
-
         }
 
     }
@@ -180,8 +178,8 @@ namespace CoreTypes
         public string Currency { get; set; } = "UNK";
         public string ExchangeName { get; set; } = "UNK";
         public int MaxErrorsPerDay = 0;
-        public List<MarketConfiguration> Markets { get; set; } = new ();
-        public string Verify(List<int> IDs, List<string> strategyNames,List<string> exchanges,  List<string> currencies, List<string> mktExs)
+        public List<MarketConfiguration> Markets { get; set; } = new();
+        public string Verify(List<int> IDs, List<string> strategyNames, List<string> exchanges, List<string> currencies, List<string> mktExs)
         {
             if (Id < 0) return "Id must be non-negative";
             if (IDs.Contains(Id)) return $"Id duplication detected - {Id}";
@@ -190,7 +188,7 @@ namespace CoreTypes
                 return "Currency is undefined";
             if (currencies.Contains(Currency)) return $"Currency duplication detected - {Currency}";
             currencies.Add(Currency);
-            
+
             if (string.IsNullOrWhiteSpace(ExchangeName) || Currency == "UNK")
                 return "Name of exchange is undefined";
             if (exchanges.Contains(ExchangeName)) return $"Exchange name duplication detected - {ExchangeName}";
@@ -218,7 +216,7 @@ namespace CoreTypes
         public double MinMove = -1;
         public decimal SessionCriticalLoss { get; set; } = decimal.MinValue;
         public int MaxErrorsPerDay = 0;
-        public List<StrategyConfiguration> Strategies { get; set; } = new ();
+        public List<StrategyConfiguration> Strategies { get; set; } = new();
 
         public string Verify(List<int> IDs, List<string> strategyNames, List<string> mktExs)
         {
@@ -236,7 +234,9 @@ namespace CoreTypes
             if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
             if (BigPointValue <= 0) return "BigPointValue must be positive";
             if (MinMove <= 0) return "MinMove must be positive";
-            //if (Strategies == null || Strategies.Count == 0) return "Strategies are undefined"; // restriction excluded to allow subscribe for additional instruments
+            // We CAN have the situation where there are no strategies traded a given market.
+            // it's true if a given market used just for indicator calculation.
+            // So, condition 'Strategy.Count == 0' is removed.
             if (Strategies == null) return "Strategies are undefined";
             var idx = 0;
             foreach (var errString in Strategies.Select(sc => sc.Verify(IDs, strategyNames)))
@@ -281,7 +281,7 @@ namespace CoreTypes
 
         public static StrategyParameters UpdateOldStyleValues(StrategyParameters sps)
         {
-            if (sps is {Parameters: { }})
+            if (sps is { Parameters: { } })
             {
                 foreach (var p in sps.Parameters)
                 {
@@ -474,7 +474,7 @@ namespace CoreTypes
         public double TrailingDelta;                // must be >0
         public double ActivationProfit;             // must be >0
 
-        public DynamicGuard DynamicGuardDescription = new ();
+        public DynamicGuard DynamicGuardDescription = new();
 
         public int StoplossRestriction_MaxBarsToWaitForOppositeSignal = 1000;
         public bool StoplossRestriction_GoToFlatMustLiftRestriction = true;
