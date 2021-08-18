@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text.Json.Serialization;
+using System.Xml.Serialization;
 using Newtonsoft.Json.Converters;
 
 namespace CoreTypes
@@ -131,6 +133,46 @@ namespace CoreTypes
 
             return null;
         }
+
+        private static readonly XmlSerializer serializer = new XmlSerializer(typeof(TradingConfiguration));
+        public static TradingConfiguration Restore(string fileName)
+        {
+            try
+            {
+                if (!File.Exists(fileName)) return null;
+                using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                {
+                    return (TradingConfiguration)serializer.Deserialize(fs);
+                }
+            }
+            catch
+            {
+                return null;
+            }
+
+        }
+        public string Save(string fileName)
+        {
+            try
+            {
+                string folder = Path.GetDirectoryName(Path.GetFullPath(fileName));
+                if (folder != null && !Directory.Exists(folder))
+                    Directory.CreateDirectory(folder);
+
+                using (TextWriter writer = new StreamWriter(fileName))
+                {
+                    serializer.Serialize(writer, this);
+                }
+
+                return null;
+            }
+            catch (Exception exception)
+            {
+                return exception.Message;
+            }
+
+        }
+
     }
     public class ExchangeConfiguration
     {
@@ -194,7 +236,8 @@ namespace CoreTypes
             if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
             if (BigPointValue <= 0) return "BigPointValue must be positive";
             if (MinMove <= 0) return "MinMove must be positive";
-            if (Strategies == null || Strategies.Count == 0) return "Strategies are undefined";
+            //if (Strategies == null || Strategies.Count == 0) return "Strategies are undefined"; // restriction excluded to allow subscribe for additional instruments
+            if (Strategies == null) return "Strategies are undefined";
             var idx = 0;
             foreach (var errString in Strategies.Select(sc => sc.Verify(IDs, strategyNames)))
             {

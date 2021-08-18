@@ -34,7 +34,7 @@ namespace CoreTypes
             return _owner.RestrictionsManager.GetRestriction(CommandSource.EndOfSession) == TradingRestriction.HardStop;
         }
 
-        private bool _toProcessNow ;
+        //private bool _toProcessNow ;
         public (string markeCode, string exchange, string error) ProcessContractInfo(ContractInfo ci, DateTime utcNow, 
             List<(string mex, int bpv, double mm)> newBpvMms)
         {
@@ -46,7 +46,7 @@ namespace CoreTypes
             );
             if (ci != null)
             {
-                _toProcessNow = true;
+                //_toProcessNow = true;
                 _currentContract = ci;
                 var (b, mm) = _owner.UpdateMinMoveAndBPV(_currentContract.Multiplier, _currentContract.MinTick);
                 if(b > 0 || mm > 0) newBpvMms.Add((_owner.MarketCode+_owner.Exchange,b,mm));
@@ -57,13 +57,13 @@ namespace CoreTypes
                     err = $"Unknown time zone id detected for {_owner.Exchange}";
                 }
             }
-            else
-            {
-                _toProcessNow = false;
-            }
+            //else
+            //{
+            //    _toProcessNow = false;
+            //}
             if (_currentContract == null)
             {
-                if (_toProcessNow)
+                //if (_toProcessNow)
                 {
                     _owner.RestrictionsManager.SetEndOfContractRestriction(TradingRestriction.HardStop);
                     _owner.RestrictionsManager.SetEndOfSessionRestriction(TradingRestriction.HardStop);

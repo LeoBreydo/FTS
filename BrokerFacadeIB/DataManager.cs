@@ -214,10 +214,15 @@ namespace BrokerFacadeIB
 
                 _client.ClientSocket.reqMarketDataType(3);
                 _client.ClientSocket.reqMktData(tickerId, contract, string.Empty, false, false, null);
+#if tmp_Hidden
+                // the following request is rejected via mkt data permission
+                // that is ok for demo account BUT!
+                // todo!!! to clarify if the following code is ok or not because request is not registered in _registry and as result rejection message is missed in handle_Error
                 tickerId = GetNextTickerId();
                 _5sBars.Add(tickerId, (symbolExchange, contract.LocalSymbol));
                 _client.ClientSocket.reqMarketDataType(3);
                 _client.ClientSocket.reqRealTimeBars(tickerId, contract, 5, "TRADES", true, null);
+#endif                
             }
         }
 
@@ -225,7 +230,13 @@ namespace BrokerFacadeIB
         {
             lock (_lock)
             {
-                if (!_registry.ContainsKey(oid)) return;
+                if (!_registry.ContainsKey(oid))
+                {
+#if !tmp_Fulloutput // to save all error messages while application is not tested carefully
+                    AddMessage("handle_Error", $"oid={oid}, errorCode={errorCode}, str={str}");
+#endif
+                    return;
+                }
                 var symbolExchange = _registry[oid].symbolExchange;
                 AddMessage("ERROR",
                     $"Subscription to IB marketCode {symbolExchange} failed, ErrorCode={errorCode}, Msg={str}");

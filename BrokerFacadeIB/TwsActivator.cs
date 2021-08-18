@@ -105,10 +105,6 @@ namespace BrokerFacadeIB
                     DebugLog("Started");
                     while (!_cancellationTokenSource.Token.IsCancellationRequested)
                     {
-//#if DEBUG
-//                        if (_twsProcess != null)
-//                            DebugLog("title:" + _twsProcess.GetMainWindowTitle());
-//#endif
                         SecondPulse();
                         Thread.Sleep(1000);
                     }

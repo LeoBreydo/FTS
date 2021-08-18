@@ -34,7 +34,8 @@ namespace Driver
 
         private TradingConfiguration ReadAndVerifyConfiguration(string path)
         {
-            return new();
+            var tcfg = TradingConfiguration.Restore(path);
+            return tcfg ?? new();
         }
 
         public void DoWork(DateTime dt)

@@ -208,8 +208,11 @@ namespace CoreTypes
             LMOD ordersToPost = new();
             foreach (var (mt, o, trades) in ogs)
             {
-                _reportsRoutingMap.Add(o.ClOrdId, mt);
-                ordersToPost.Add(o);
+                if (o != null)
+                {
+                    _reportsRoutingMap.Add(o.ClOrdId, mt);
+                    ordersToPost.Add(o);
+                }
                 if (trades.Count > 0) newTrades.AddRange(trades);
             }
             return ordersToPost;
