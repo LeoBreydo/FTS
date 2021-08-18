@@ -165,6 +165,10 @@ namespace CoreTypes
 
             ApplyNewTicks(so);
             var newBars = MakeNewOneMinuteBars(so);
+            //if (newBars != null && newBars.Count > 0)
+            //{
+            //    int a = 1; check that we have stream of minute bars
+            //}
 
             // TODO inject new bars (and ticks?) to indicator container
             var subscriptionList = ProcessContractInfos(so, out var bm);

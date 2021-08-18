@@ -144,21 +144,59 @@ namespace BrokerFacadeIB
 
             _contractQueue.Add(contractDetails.Details);
         }
+#if DEBUG
+        int TransformDelayedTagToMainTag(int field)
+        {
+            switch (field)
+            {
+                case 66: // delayed bid
+                    return 1; // bid price
+                case 67: // delayed ask
+                    return 2; // ask price
+                case 68: // delayed last
+                    return 4; // last price
+
+                case 69: // delayed bid size
+                    return 0; // bid size
+                case 70: // delayed ask size
+                    return 3; // ask size
+                case 71: // delayed last size
+                    return 5; // last size
+
+                    
+                default:
+                        return field;
+            }
+
+        }
+#endif
         private void _client_TickPrice(TickPriceMessage tickPrice)
         {
             //TODO uncomment next string when got a normal connection
             //if (tickPrice.Field > 4) return;
-            if (!_registry.ContainsKey(tickPrice.RequestId)) return;
-            var symbolExchange = _registry[tickPrice.RequestId].symbolExchange;
-            _quoteQueue.Add(new TickInfo(symbolExchange, tickPrice.Field, tickPrice.Price));
+            var field = TransformDelayedTagToMainTag(tickPrice.Field);
+
+            if (!_registry.TryGetValue(tickPrice.RequestId,out var info)) return;
+
+            _quoteQueue.Add(new TickInfo(info.symbolExchange, field, tickPrice.Price));
+#if DEBUG
+            if (tickPrice.Field == 68) //delayed ask price:  subscription to 5s bars is not allowed in this mode, so make pseudo 5SecBar from last price to have 1min quotes stream in server
+                _barsQueue.Add(new Bar5s(info.symbolExchange, info.contractCode,
+                    tickPrice.Price, tickPrice.Price, tickPrice.Price, tickPrice.Price, DateTime.UtcNow));
+
+#else
+#error exclude the temporary functionaly
+#endif
         }
         private void _client_TickSize(TickSizeMessage tickSize)
         {
             //TODO uncomment next string when got a normal connection
             //if (tickSize.Field > 5) return;
+            var field = TransformDelayedTagToMainTag(tickSize.Field);
+
             if (!_registry.ContainsKey(tickSize.RequestId)) return;
             string symbolExchange = _registry[tickSize.RequestId].symbolExchange;
-            _quoteQueue.Add(new TickInfo(symbolExchange, tickSize.Field, tickSize.Size));
+            _quoteQueue.Add(new TickInfo(symbolExchange, field, tickSize.Size));
         }
 
         private readonly DateTime _baseUnixTime = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -214,33 +252,35 @@ namespace BrokerFacadeIB
 
                 _client.ClientSocket.reqMarketDataType(3);
                 _client.ClientSocket.reqMktData(tickerId, contract, string.Empty, false, false, null);
-#if tmp_Hidden
-                // the following request is rejected via mkt data permission
-                // that is ok for demo account BUT!
-                // todo!!! to clarify if the following code is ok or not because request is not registered in _registry and as result rejection message is missed in handle_Error
+
                 tickerId = GetNextTickerId();
                 _5sBars.Add(tickerId, (symbolExchange, contract.LocalSymbol));
                 _client.ClientSocket.reqMarketDataType(3);
                 _client.ClientSocket.reqRealTimeBars(tickerId, contract, 5, "TRADES", true, null);
-#endif                
             }
         }
 
-        public void handle_Error(int oid, int errorCode, string str)
+        public void handle_Error(int tickerId, int errorCode, string str)
         {
             lock (_lock)
             {
-                if (!_registry.ContainsKey(oid))
+                if (_registry.TryGetValue(tickerId,out var symbolExchange))
                 {
-#if !tmp_Fulloutput // to save all error messages while application is not tested carefully
-                    AddMessage("handle_Error", $"oid={oid}, errorCode={errorCode}, str={str}");
-#endif
-                    return;
+                    AddMessage("ERROR",
+                        $"Subscription to IB marketCode {symbolExchange} failed, ErrorCode={errorCode}, Msg={str}");
                 }
-                var symbolExchange = _registry[oid].symbolExchange;
-                AddMessage("ERROR",
-                    $"Subscription to IB marketCode {symbolExchange} failed, ErrorCode={errorCode}, Msg={str}");
+                else if (_5sBars.TryGetValue(tickerId, out symbolExchange))
+                {
+                    AddMessage("ERROR",
+                        $"Subscription to IB 5Sec_Bars marketCode {symbolExchange} failed, ErrorCode={errorCode}, Msg={str}");
+                }
+#if !tmp_Fulloutput // to save all error messages while application is not tested carefully
+                else
+                {
+                    AddMessage("IBDEBUG", $"common msg handle_Error: tickerId={tickerId}, errorCode={errorCode}, str={str}");
+                }
             }
+#endif
         }
 
         private void Unsubscribe(string contractCode)
