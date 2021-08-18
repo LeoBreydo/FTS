@@ -87,27 +87,6 @@ namespace BrokerFacadeIB
                 NextAttempt();
         }
 
-        // todo to review the forming log messages: items with tags "TWS" and items intended for debug log
-        //private static bool TWSIsWorking()
-        //{
-        //    return Process.GetProcessesByName("tws").FirstOrDefault() != null;
-        //}
-        //private void StartEngine()
-        //{
-        //    if (!TWSIsWorking())
-        //    {
-        //        _engine.AddMessage("TWS", "TWS application is not started");
-        //        //_engine.RestartTws(); // start tws from here? (console mode)
-        //        SetState(EStates.PauseBeforeStartEngine, 60);
-        //        return;
-        //    }
-
-        //    if (_engine.Start())
-        //        SetState(EStates.EngineStarted);
-        //    else
-        //        NextAttempt();
-        //}
-
         private void SetState(EStates newState,int counter=0)
         {
             _state = newState;

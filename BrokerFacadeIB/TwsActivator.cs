@@ -54,7 +54,7 @@ namespace BrokerFacadeIB
 #if DEBUG
             lock (_Lock_LogFile)
             {
-                File.AppendAllText("Logout.txt",
+                File.AppendAllText("TwsActivatorLogout.txt",
                     DateTime.UtcNow.ToString("yyyyMMdd-HH:mm:ss.fff ") + txt + "\r\n");
             }
 #endif
