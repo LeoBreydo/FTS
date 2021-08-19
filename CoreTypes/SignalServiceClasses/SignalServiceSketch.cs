@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 
-namespace CoreTypes
+namespace CoreTypes.SignalServiceClasses
 {
     // just a stub
     public class SignalServiceSketch
@@ -20,13 +20,5 @@ namespace CoreTypes
         {
             //throw new System.NotImplementedException();
         }
-    }
-
-    public enum Signal
-    {
-        NO_SIGNAL = -2,
-        TO_SHORT = -1,
-        TO_FLAT = 0,
-        TO_LONG = 1
     }
 }

@@ -2,6 +2,7 @@
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using Binosoft.TraderLib.Indicators;
 using BrokerFacadeIB;
 
 namespace Driver
@@ -11,6 +12,7 @@ namespace Driver
         static void Main(string[] args)
         {
             ReadIBCredentials();
+            IndicatorsServer.Init(GetIndicatorsFolder());
 
             var cancellationTokenSource = new CancellationTokenSource();
             var t = MainLoop(cancellationTokenSource);
@@ -63,6 +65,13 @@ namespace Driver
                 string ret = Console.ReadLine();
                 if (check(ret)) return ret;
             }
+        }
+        private static string GetIndicatorsFolder()
+        {
+            var path = Path.GetFullPath("Indicators");
+            if (!Directory.Exists(path))
+                Directory.CreateDirectory(path);
+            return path;
         }
 
         private static Task MainLoop(CancellationTokenSource cts)

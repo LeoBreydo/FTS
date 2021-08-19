@@ -1,4 +1,5 @@
 ﻿using System;
+using System.IO;
 using BrokerFacadeIB;
 using CoreTypes;
 
@@ -12,7 +13,7 @@ namespace Driver
         public ClientCommunicationFacade Client {get;}
         public Scheduler Scheduler { get; }  
         public InfoLogger Logger { get; }
-        public SignalService SignalService { get; }
+        public SignalService SignalService => TService.SignalService;
 
         private bool _stoppedByHost = false;
         
@@ -25,11 +26,19 @@ namespace Driver
             // 2) web controller communicator
 
             Configuration = ReadAndVerifyConfiguration("./cfg.xml");
-            SignalService = new SignalService();
-            TService = new TradingService(Configuration, SignalService);
+            
+            TService = new TradingService(Configuration, GetStrategiesFolder());
             Client = new ClientCommunicationFacade();
             Scheduler = new Scheduler();
             Logger = new(15, "./");
+        }
+
+        private static string GetStrategiesFolder()
+        {
+            var path = Path.GetFullPath("Strategies");
+            if (!Directory.Exists(path))
+                Directory.CreateDirectory(path);
+            return path;
         }
 
         private TradingConfiguration ReadAndVerifyConfiguration(string path)
@@ -52,19 +61,6 @@ namespace Driver
             
             Logger.PostToLog(so.CurrentUtcTime, t.TicksInfo, t.BarsInfo, t.TradesInfo,
                 so.OrderStateMessageList, so.TextMessageList, t.Errors);
-
-            foreach (var bm in t.NewBpvMms)
-            {
-                if (bm.Item2 > 0)
-                {
-                    //update BigPointValue for bm.Item1
-                }
-
-                if (bm.Item3 > 0)
-                {
-                    //update MinMove for bm.Item1
-                }
-            }
 
             SignalService.ApplyNewMarketRestrictions(t.Commands);
         }

@@ -1,7 +1,7 @@
 ﻿using System;
 using Indicators.Common;
 
-namespace CoreTypes
+namespace CoreTypes.SignalServiceClasses
 {
     class ScaledTimeGridBarAggregator
     {

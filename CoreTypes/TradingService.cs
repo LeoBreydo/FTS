@@ -22,11 +22,10 @@ namespace CoreTypes
         public LS BarsInfo;
         public LS TradesInfo;
         public LSSS Errors;
-        public List<(string, int, double)> NewBpvMms;
         public List<(string, TradingRestriction)> Commands; //<market><exchange> -> new restriction
 
         public OutInfo(LSS subscriptions, LMOD orders, TradingServiceState state,
-            LS ticksInfo, LS barsInfo, LS tradesInfo, LSSS errors, List<(string, int, double)> newBpvMms,
+            LS ticksInfo, LS barsInfo, LS tradesInfo, LSSS errors, 
             List<(string, TradingRestriction)> commands)
         {
             Subscriptions = subscriptions;
@@ -36,7 +35,6 @@ namespace CoreTypes
             BarsInfo = barsInfo;
             TradesInfo = tradesInfo;
             Errors = errors;
-            NewBpvMms = newBpvMms;
             Commands = commands;
         }
     }
@@ -108,10 +106,11 @@ namespace CoreTypes
         public ServiceRestrictionsManager RestrictionManager { get; } = new();
         public IValueTracker<int,WorkingState> ErrorTracker { get; }
         private DateTime _lastDayStart = DateTime.UtcNow.AddDays(-1);
-
-        public TradingService(TradingConfiguration cfg, SignalService signalService)
+        public readonly SignalService SignalService;
+        public TradingService(TradingConfiguration cfg,string strategiesFolder)
         {
             Id = cfg.Id;
+            SignalService = new SignalService(cfg, strategiesFolder);
             _currentRestriction = RestrictionManager.GetCurrentRestriction();
             CommandReceivers.Add(Id,this);
             ErrorTracker = new ErrorTracker(cfg.MaxErrorsPerDay);
@@ -151,7 +150,7 @@ namespace CoreTypes
                             cst.StoplossRestriction_MaxBarsToWaitForOppositeSignal,
                             cst.StoplossRestriction_GoToFlatMustLiftRestriction);
 
-                        var st = new StrategyTrader(cst.Id, position, cst.NbrOfContracts, signalService, pv);
+                        var st = new StrategyTrader(cst.Id, position, cst.NbrOfContracts, SignalService, pv);
                         position.Owner = st;
                         RegisterStrategyTrader(cet.ExchangeName, cmt.MarketName,st);
                     }
@@ -169,15 +168,12 @@ namespace CoreTypes
 
             ApplyNewTicks(so);
             var newBars = MakeNewOneMinuteBars(so);
-            //if (newBars != null && newBars.Count > 0)
-            //{
-            //    int a = 1; //check that we have stream of minute bars
-            //}
 
-            // TODO inject new bars (and ticks?) to indicator container
             var subscriptionList = ProcessContractInfos(so, out var bm, out var commands);
             var newTrades = ApplyOrderReports(so, out var errorMessages);
-            
+
+            SignalService.ProcessCurrentState(so.CurrentUtcTime, bm, newBars);
+
             UpdateProfitLossInfos(so);
             UpdateParentRestrictions();
 
@@ -192,7 +188,6 @@ namespace CoreTypes
                 barsInfo: GetBarsInfo(newBars),
                 tradesInfo: newTrades,
                 errors: errorMessages,
-                newBpvMms: bm,
                 commands: commands
             );
         }

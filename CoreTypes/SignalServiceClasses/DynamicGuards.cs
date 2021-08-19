@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace CoreTypes
+namespace CoreTypes.SignalServiceClasses
 {
     public interface IDynamicGuard
     {

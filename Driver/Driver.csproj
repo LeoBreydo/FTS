@@ -10,4 +10,10 @@
     <ProjectReference Include="..\BrokerFacadeIB\BrokerFacadeIB.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Reference Include="Binosoft.TraderLib.Indicators">
+      <HintPath>..\External\Binosoft.TraderLib.Indicators.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+
 </Project>

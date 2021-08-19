@@ -1,7 +1,7 @@
 ﻿using System;
 using PluginsInterfaces;
 
-namespace CoreTypes
+namespace CoreTypes.SignalServiceClasses
 {
     public static class TimeFrameHelper 
     {
