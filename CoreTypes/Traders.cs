@@ -125,45 +125,43 @@ namespace CoreTypes
             BigPointValue = bpv;
             MinMove = minMove;
         }
-        public (MarketTrader, MarketOrderDescription order, List<string>) GenerateOrders(DateTime utcNow)
+        public (MarketTrader, MarketOrderDescription order) GenerateOrders(DateTime utcNow, InfoCollector ic)
         {
-            return OrderGenerator.GenerateOrders(this, utcNow);
+            return OrderGenerator.GenerateOrders(this, utcNow,ic);
         }
-        public (List<string> tlist, bool isOrderFinished) ApplyOrderReport(DateTime utcTime, OrderStateMessage report, out string errorMessage)
+        public bool ApplyOrderReport(DateTime utcTime, OrderStateMessage report, InfoCollector ic)
         {
-            return OrderReportsProcessor.ApplyOrderReport(this, utcTime, report, out errorMessage);
+            return OrderReportsProcessor.ApplyOrderReport(this, utcTime, report, ic);
         }
-        public static List<string> ApplyPartialVirtualFill(StrategyTrader s, decimal quote,
-            DateTime utcNow, int virtuallyFilled, string clOrderId, int clBasketId)
+        public static void ApplyPartialVirtualFill(StrategyTrader s, decimal quote,
+            DateTime utcNow, int virtuallyFilled, string clOrderId, int clBasketId, InfoCollector ic)
         {
             var r =
                 new List<(Execution, int)>
                     {(new Execution(clOrderId, clBasketId, utcNow, quote), virtuallyFilled)};
-            var t = s.Position.ProcessNewDeals(r);
+            s.Position.ProcessNewDeals(r,ic);
             s.CurrentOperationAmount -= virtuallyFilled;
-            return t;
         }
-        public static List<string> ApplyVirtualFill(StrategyTrader s, decimal quote, DateTime utcNow,
-            string clOrderID, int clBasketID)
+        public static void ApplyVirtualFill(StrategyTrader s, decimal quote, DateTime utcNow,
+            string clOrderID, int clBasketID, InfoCollector ic)
         {
             var r =
                 new List<(Execution, int)>
                     {(new Execution(clOrderID, clBasketID, utcNow, quote), s.CurrentOperationAmount)};
-            var t = s.Position.ProcessNewDeals(r);
+            s.Position.ProcessNewDeals(r,ic);
             s.CurrentOperationAmount = 0;
-            return t;
         }
 
-        public static List<string> ApplyRealFill(StrategyTrader s, OrderExecutionMessage report) => 
-            ApplyRealFill(s, report, report.SgnQty);
+        public static void ApplyRealFill(StrategyTrader s, OrderExecutionMessage report, InfoCollector ic) => 
+            ApplyRealFill(s, report, report.SgnQty,ic);
 
-        public static List<string> ApplyRealFill(StrategyTrader s, OrderExecutionMessage report, int amount)
+        public static void ApplyRealFill(StrategyTrader s, OrderExecutionMessage report, int amount, InfoCollector ic)
         {
             var opAmountBefore = s.CurrentOperationAmount;
             var r =
                 new List<(Execution, int)>
                     {(new Execution(report.ExecId, report.OrderId, report.TransactTime, report.Price), amount)};
-            var t = s.Position.ProcessNewDeals(r);
+            s.Position.ProcessNewDeals(r, ic);
             if (opAmountBefore == 0) // no operation expected
             {
                 if (amount != 0) // but something is executed
@@ -188,7 +186,6 @@ namespace CoreTypes
                     s.CurrentOperationAmount = 0;
                 }
             }
-            return t;
         }
 
         public List<int> CancelOutdatedOrders(DateTime currentUtcTime)

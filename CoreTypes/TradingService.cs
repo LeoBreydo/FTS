@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using static CoreTypes.MessageStringProducer;
@@ -81,11 +81,6 @@ namespace CoreTypes
             }
         }
 
-        private List<string> GetTicksInfo(DateTime utcNow) => 
-            _priceProviderMap.Select(kvp => PriceProviderString(kvp.Value,utcNow, kvp.Key)).ToList();
-        private static List<string> GetBarsInfo(List<Tuple<Bar, string, bool>> bars) => 
-            bars.Select(t => BarInfoString(t.Item1,t.Item2,t.Item3)).ToList();
-
         private void RegisterStrategyTrader(string exchangeName, string marketName, StrategyTrader st)
         {
             if (Exchanges.ContainsKey(exchangeName))
@@ -166,29 +161,35 @@ namespace CoreTypes
             if (schCmdList?.Count > 0) ApplyCommands(schCmdList);
             if(icCommands?.Count > 0) ApplyCommands(icCommands);
 
-            ApplyNewTicks(so);
-            var newBars = MakeNewOneMinuteBars(so);
+            var ic = new InfoCollector();
 
-            var subscriptionList = ProcessContractInfos(so, out var bm, out var commands);
-            var newTrades = ApplyOrderReports(so, out var errorMessages);
+            ApplyNewTicks(so,ic);
+            MakeNewOneMinuteBars(so, ic);
 
-            SignalService.ProcessCurrentState(so.CurrentUtcTime, bm, newBars);
+            // TODO inject new bars (and ticks?) to indicator container
+            var newBars = ic.BarsInfo;
+            var newTicks = ic.TicksInfo;
+
+            ProcessContractInfos(so, ic);
+            ApplyOrderReports(so, ic);
+            
+            SignalService.ProcessCurrentState(so.CurrentUtcTime, ic.NewBpvMms, newBars);
 
             UpdateProfitLossInfos(so);
             UpdateParentRestrictions();
 
-            var ordersToPost = GenerateOrders(so.CurrentUtcTime, newTrades);
-            var currentState = GetCurrentState(errorMessages, so);
+            GenerateOrders(so.CurrentUtcTime, ic);
+            var currentState = GetCurrentState(ic.Errors, so);
 
              return new(
-                subscriptions: subscriptionList,
-                orders: ordersToPost,
+                subscriptions: ic.Subscriptions,
+                orders: ic.Orders,
                 state: currentState,
-                ticksInfo: GetTicksInfo(so.CurrentUtcTime),
-                barsInfo: GetBarsInfo(newBars),
-                tradesInfo: newTrades,
-                errors: errorMessages,
-                commands: commands
+                ticksInfo: ic.TickInfoAsStrings(so.CurrentUtcTime),
+                barsInfo: ic.BarInfoAsStrings,
+                tradesInfo: ic.TradesInfo,
+                errors: ic.Errors,
+                commands: ic.Commands
             );
         }
 
@@ -202,24 +203,19 @@ namespace CoreTypes
             return new TradingServiceState(msgToClient, this);
         }
 
-        private LMOD GenerateOrders(DateTime utcNow, LS newTrades)
+        private void GenerateOrders(DateTime utcNow, InfoCollector ic)
         {
-            List<(MarketTrader, MarketOrderDescription, List<string>)> ogs = 
+            List<(MarketTrader, MarketOrderDescription)> ogs = 
                 (from et in Exchanges.Values 
                     from mt in et.Markets.Values 
-                    select mt.GenerateOrders(utcNow))
+                    select mt.GenerateOrders(utcNow, ic))
                 .ToList();
-            LMOD ordersToPost = new();
-            foreach (var (mt, o, trades) in ogs)
+            foreach (var (mt, o) in ogs)
             {
-                if (o != null)
-                {
-                    _reportsRoutingMap.Add(o.ClOrdId, mt);
-                    ordersToPost.Add(o);
-                }
-                if (trades.Count > 0) newTrades.AddRange(trades);
+                if (o == null) continue;
+                _reportsRoutingMap.Add(o.ClOrdId, mt);
+                ic.Accept(o);
             }
-            return ordersToPost;
         }
         private void UpdateProfitLossInfos(StateObject so)
         {
@@ -236,8 +232,7 @@ namespace CoreTypes
                 ? TradingRestriction.HardStop
                 : TradingRestriction.NoRestrictions);
         }
-
-        private LS ApplyOrderReports(StateObject so, out LSSS errorMessages)
+        private void ApplyOrderReports(StateObject so, InfoCollector ic)
         {
             static string ProcessUnknownReport(OrderStateMessage report)
             {
@@ -262,15 +257,13 @@ namespace CoreTypes
                 }
             }
 
-            errorMessages = new();
-            if (so.OrderStateMessageList.Count == 0) return null;
-            LS newTrades = new();
-            
+            if (so.OrderStateMessageList.Count == 0) return;
+
             foreach (var report in so.OrderStateMessageList)
             {
                 if (!_reportsRoutingMap.ContainsKey(report.ClOrderId))
                 {
-                    errorMessages.Add(("UNK","UNK",ProcessUnknownReport(report)));
+                    ic.Accept(("UNK","UNK",ProcessUnknownReport(report)));
                     ErrorTracker.ChangeValueBy(1);
                 }
                 else
@@ -278,12 +271,8 @@ namespace CoreTypes
                     if (report.MyType == OrderStateMessageType.Post)
                         continue;
                     var mt = _reportsRoutingMap[report.ClOrderId];
-                    var (tradeList, isOrderFinished) = mt.ApplyOrderReport(so.CurrentUtcTime, 
-                        report, out var errorMessage);
-                    if (!string.IsNullOrEmpty(errorMessage))
-                        errorMessages.Add((mt.MarketCode, mt.Exchange, errorMessage));
-                    if (isOrderFinished) _reportsRoutingMap.Remove(report.ClOrderId);
-                    if (tradeList?.Count > 0) newTrades.AddRange(tradeList);
+                    if (_reportsRoutingMap[report.ClOrderId].ApplyOrderReport(so.CurrentUtcTime, report, ic)) 
+                        _reportsRoutingMap.Remove(report.ClOrderId);
                 }
             }
             // timeout management
@@ -294,39 +283,22 @@ namespace CoreTypes
                 {
                     if (!_reportsRoutingMap.ContainsKey(id)) continue;
                     var mt = _reportsRoutingMap[id];
-                    errorMessages.Add((mt.MarketCode,mt.Exchange, $"order with client id {id} was cancelled by timeout"));
+                    ic.Accept((mt.MarketCode,mt.Exchange, $"order with client id {id} was cancelled by timeout"));
                     _reportsRoutingMap.Remove(id);
                 }
             }
-            return newTrades;
         }
-        private LSS ProcessContractInfos(StateObject so, out List<(string, int, double)>  nbml, 
-            out List<(string,TradingRestriction)> commands)
+        private void ProcessContractInfos(StateObject so, InfoCollector ic)
         {
-            List<(string, int, double)> bm = new ();
-            var errList =
-                (from ci in so.ContractInfoList
-                    let key = ci.MarketName + ci.Exchange
-                    where _contractManagers.ContainsKey(key)
-                    select _contractManagers[key].SetNewContractInfo(ci, bm)
-                    into res
-                    select res).ToList();
-
-            var subscriptionList = _contractManagers.Values
-                .Select(cm => cm.ProcessContractInfo(null, so.CurrentUtcTime, bm)).ToList();
-            commands = subscriptionList
-                .Where(t => t.command != 0)
-                .Select(t => (t.markeCode + t.exchange, t.command < 0 ? TradingRestriction.NoRestrictions : TradingRestriction.HardStop))
-                .ToList();
-            foreach (var error in errList.Where(t => t != string.Empty))
-                so.TextMessageList.Add(new Tuple<string, string>("SubscriptionError", error));
-            nbml = bm;
-
-            return subscriptionList.Where(t=>t.markeCode != string.Empty)
-                .Select(t=> (t.markeCode, t.exchange))
-                .ToList();
+            foreach (var ci in so.ContractInfoList)
+            {
+                var key = ci.MarketName + ci.Exchange;
+                if (_contractManagers.ContainsKey(key))
+                    _contractManagers[key].SetNewContractInfo(ci, ic, so);
+            }
+            foreach (var cm in _contractManagers.Values) cm.ProcessContractInfo(so.CurrentUtcTime, ic);
         }
-        private List<Tuple<Bar, string, bool>> MakeNewOneMinuteBars(StateObject so)
+        private void MakeNewOneMinuteBars(StateObject so, InfoCollector ic)
         {
             HashSet<string> acc = new();
             List<Tuple<Bar, string, bool>> newBars = new();
@@ -343,12 +315,13 @@ namespace CoreTypes
                 var ret = _barAggregatorMap[mc].ProcessTime(so.CurrentUtcTime);
                 if (ret != null) newBars.Add(ret);
             }
-
-            return newBars;
+            ic.Accept(newBars);
         }
-        private void ApplyNewTicks(StateObject so)
+        private void ApplyNewTicks(StateObject so, InfoCollector ic)
         {
-            foreach (var ti in so.TickInfoList) _priceProviderMap[ti.SymbolExchange].Update(so.CurrentUtcTime, ti);
+            var utcNow = so.CurrentUtcTime;
+            foreach (var ti in so.TickInfoList) _priceProviderMap[ti.SymbolExchange].Update(utcNow, ti);
+            ic.Accept(_priceProviderMap.Select(kvp => (kvp.Key,kvp.Value.GetPriceInfo)).ToList());
         }
         public void ApplyCommand(ICommand command)
         {
