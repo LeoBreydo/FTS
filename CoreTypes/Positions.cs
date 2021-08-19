@@ -213,7 +213,7 @@ namespace CoreTypes
             Owner.PositionValidator.ClearStopLossRestriction();
         }
 
-        public List<string> ProcessNewDeals(IEnumerable<(Execution, int)> deals)
+        public void ProcessNewDeals(IEnumerable<(Execution, int)> deals, InfoCollector ic)
         {
             // Call condition : toReduce != 0 && reduceBy != 0
             static (int, int)? ReduceDeals(int toReduce, int reduceBy)
@@ -307,8 +307,7 @@ namespace CoreTypes
             WeightedOpenQuote = (double) woq;
 
             Owner.PositionValidator.UpdateGuards();
-
-            return trades;
+            if(trades.Count > 0) ic.Accept(trades);
         }
 
         public void SetBigPointValue(int bpv)

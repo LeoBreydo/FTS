@@ -24,8 +24,8 @@ namespace CoreTypes
             "# SymbolExchange,Open,High,Low,Close," +
             "StartOfBar:yyyyMMdd:HHmmss,EndOfBar:yyyyMMdd:HHmmss,IsNewContract";
 
-        public static string PriceProviderString(PriceProvider pp, DateTime utcNow, string symbolExchange) => 
-            $"{symbolExchange},{utcNow:yyyyMMdd:HHmmss},{pp.Bid},{pp.Ask},{pp.LastPrice},{pp.BidSize},{pp.AskSize},{pp.LastSize}";
+        public static string PriceProviderString(PriceProviderInfo pp, DateTime utcNow, string symbolExchange) => 
+            $"{symbolExchange},{utcNow:yyyyMMdd:HHmmss},{pp.Bid},{pp.Ask},{pp.Last},{pp.BSize},{pp.ASize},{pp.LSize}";
 
         public static string PriceProviderStringFormat => 
             "# SymbolExchange,Time:yyyyMMdd:HHmmss,Bid,Ask,Last,BidSize,AskSize,LastSize";

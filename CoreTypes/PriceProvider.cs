@@ -40,5 +40,8 @@ namespace CoreTypes
         }
 
         public (decimal bid, decimal ask, decimal last) LastPrices => (Bid, Ask, LastPrice);
+        public PriceProviderInfo GetPriceInfo => new (Bid, Ask, LastPrice, BidSize, AskSize, LastSize);
     }
+
+    public record PriceProviderInfo(decimal Bid, decimal Ask, decimal Last, int BSize, int ASize, int LSize);
 }

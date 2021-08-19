@@ -40,31 +40,24 @@ namespace CoreTypes
             return _owner.RestrictionsManager.GetRestriction(CommandSource.EndOfSession) == TradingRestriction.HardStop;
         }
 
-        private bool _toProcessNow;
-
-        public string SetNewContractInfo(ContractInfo ci, List<(string mex, int bpv, double mm)> newBpvMms)
+        public void SetNewContractInfo(ContractInfo ci, InfoCollector ic, StateObject so)
         {
-            var error = string.Empty;
             if (ci != null)
             {
                 _currentContract = ci;
                 var (b, mm) = _owner.UpdateMinMoveAndBPV(_currentContract.Multiplier, _currentContract.MinTick);
-                if (b > 0 || mm > 0) newBpvMms.Add((_owner.MarketCode + _owner.Exchange, b, mm));
+                if (b > 0 || mm > 0) ic.Accept((_owner.MarketCode + _owner.Exchange, b, mm));
                 _owner.ContractCode = ci.LocalSymbol;
                 if (!AdjustDateTimes())
                 {
                     _currentContract = null;
-                    error = $"Unknown time zone id detected for {_owner.Exchange}/{_owner.MarketCode}";
+                    so.TextMessageList.Add(new Tuple<string, string>("SubscriptionError", 
+                        $"Unknown time zone id detected for {_owner.Exchange}/{_owner.MarketCode}"));
                 }
             }
-            return error;
         }
-        public (string markeCode, string exchange, int command) ProcessContractInfo(ContractInfo ci, DateTime utcNow,
-            List<(string mex, int bpv, double mm)> newBpvMms)
+        public void ProcessContractInfo(DateTime utcNow, InfoCollector ic)
         {
-            var cmd = 0;
-            var mc = string.Empty;
-            var ex = string.Empty;
             if (_currentContract == null)
             {
                 _owner.RestrictionsManager.SetEndOfContractRestriction(TradingRestriction.HardStop);
@@ -74,9 +67,10 @@ namespace CoreTypes
                 if ((utcNow - _lastReqDateTime).TotalMinutes > 4)
                 {
                     _lastReqDateTime = utcNow;
-                    mc = _owner.MarketCode;
-                    ex = _owner.Exchange;
-                    cmd = 1; // set restriction
+                    var mc = _owner.MarketCode;
+                    var ex = _owner.Exchange;
+                    ic.Accept(mc,ex);
+                    ic.Accept(mc+ex,1); // set restriction
                 }
             }
             else if (utcNow.Second == 0 && utcNow.Minute % 10 == 0) // every ten minutes
@@ -106,11 +100,11 @@ namespace CoreTypes
                 {
                     case true when !outOfMarketAfter:
                         // market is just opened
-                        cmd = -1; // reset restriction
+                        ic.Accept(_owner.MarketCode+_owner.Exchange,-1); //reset restriction
                         break;
                     case false when outOfMarketAfter:
                         // market is just closed
-                        cmd = 1; // set restriction
+                        ic.Accept(_owner.MarketCode + _owner.Exchange, 1); // set restriction
                         break;
                 }
 
@@ -121,8 +115,7 @@ namespace CoreTypes
                             var settlementPrice = _owner.Position.PriceProvider.LastPrice;
                             foreach (var s in _owner.StrategyMap.Values)
                                 s.Position.ProcessSettlementPrice(settlementPrice);
-                            mc = _owner.MarketCode;
-                            ex = _owner.Exchange;
+                            ic.Accept(_owner.MarketCode, _owner.Exchange);
                             break;
                         }
                     case true when !outOfSessionAfter:
@@ -134,7 +127,6 @@ namespace CoreTypes
                         }
                 }
             }
-            return (mc, ex, cmd);
         }
 
         private bool AdjustDateTimes()
