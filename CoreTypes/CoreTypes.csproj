@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net5.0</TargetFramework>
@@ -11,8 +11,23 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Reference Include="Binosoft.TraderLib.Indicators">
+      <HintPath>..\External\Binosoft.TraderLib.Indicators.dll</HintPath>
+    </Reference>
     <Reference Include="CSharpAPI">
       <HintPath>..\External\CSharpAPI.dll</HintPath>
+    </Reference>
+    <Reference Include="Functions">
+      <HintPath>..\External\Functions.dll</HintPath>
+    </Reference>
+    <Reference Include="Indicators.Common">
+      <HintPath>..\External\Indicators.Common.dll</HintPath>
+    </Reference>
+    <Reference Include="PluginsInterfaces">
+      <HintPath>..\External\PluginsInterfaces.dll</HintPath>
+    </Reference>
+    <Reference Include="SignalGenerators">
+      <HintPath>..\External\SignalGenerators.dll</HintPath>
     </Reference>
   </ItemGroup>
 

@@ -3,7 +3,7 @@
 namespace CoreTypes
 {
     // just a stub
-    public class SignalService
+    public class SignalServiceSketch
     {
         public Signal GetSignal(int strategyId)
         {
