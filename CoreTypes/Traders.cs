@@ -347,7 +347,8 @@ namespace CoreTypes
                 OffsetDealAmount = 0;
                 return new StrategyOrderInfo(Id, amount);
             }
-            if (!PositionValidator.ValidateCurrentPosition())
+            
+            if (!PositionValidator.ValidateCurrentPosition(SignalService.MustClosePositionByDynamicGuard(Id, Position.Size, Position.WeightedOpenQuote)))
             {
                 _lastSignal = Signal.NO_SIGNAL;
                 CurrentOperationAmount = -Position.Size;

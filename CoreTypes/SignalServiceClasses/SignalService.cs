@@ -22,6 +22,7 @@ namespace CoreTypes
             string error = Init(cfg, strategiesFolder);
             if (error != null) throw new Exception(error);// todo!!! modify behavior, save to log instead of exception!!!
         }
+        #region Init
         private string Init(TradingConfiguration cfg, string strategiesFolder)
         {
             _indicatorsFacade = new IndicatorsFacade(cfg);
@@ -54,9 +55,14 @@ namespace CoreTypes
             // in cur version we suppose that strategy uses the only main market (no additional instruments)
             return new() {mkt.MCX()};
         }
-
-        public void ProcessCurrentState(DateTime currentTime, List<(string, int, double)> listOf_mxBpvMM, List<Tuple<Bar, string, bool>> barValues)
+        #endregion
+        public void ProcessCurrentState(DateTime currentTime, List<(string, int, double)> listOf_mxBpvMM, 
+            List<Tuple<Bar, string, bool>> barValues,
+            List<(string mktExch, PriceProviderInfo ppi)> tickInfos)
         {
+            foreach (var tickInfo in tickInfos)
+                SetLastPrice(tickInfo.mktExch, tickInfo.ppi.Last);
+
             if (_indicatorsFacade.ProcessCurrentState(currentTime,listOf_mxBpvMM, barValues))
             {
                 foreach (StrategyInfoHolder strategy in _strategies.Values)
@@ -71,12 +77,12 @@ namespace CoreTypes
                 : Signal.TO_FLAT;
         }
 
-        public void SetLastPrice(string mktcodeExchange, double price)
+        public void SetLastPrice(string mktcodeExchange, decimal price)
         {
             if (_lastPriceHolders.TryGetValue(mktcodeExchange, out LastPriceHolder holder))
-                holder.LastPrice = price;
+                holder.LastPrice = (double)price;
         }
-        public (bool, bool) MustClosePosition(int strategyId, int position, double weightedOpenPrice)
+        public (bool closePositionByStop, bool closePositionByTarget) MustClosePositionByDynamicGuard(int strategyId, int position, double weightedOpenPrice)
         {
             return _strategies.TryGetValue(strategyId, out var strategy)
                 ? strategy.GetMustClosePositionByDynamicGuard(position, weightedOpenPrice)

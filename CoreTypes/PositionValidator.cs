@@ -396,15 +396,15 @@ namespace CoreTypes
         }
 
         // inject signals of dynamic gards
-        public bool ValidateCurrentPosition(bool closePositionByStop=false, bool closePositionByTarget = false)
+        public bool ValidateCurrentPosition((bool closePositionByStop, bool closePositionByTarget) dynamicRestrictions)
         {
             if (_currentPosition.Size == 0) return true;
-            if (StopLossPositionGuard.PositionMustBeClosed() || closePositionByStop)
+            if (StopLossPositionGuard.PositionMustBeClosed() || dynamicRestrictions.closePositionByStop)
             {
                 _reenterRestrictionAfterStoploss.OnStoplossFired(Math.Sign(_currentPosition.Size));
                 return false;
             }
-            return !(TakeProfitPositionGuard.PositionMustBeClosed() || closePositionByTarget);
+            return !(TakeProfitPositionGuard.PositionMustBeClosed() || dynamicRestrictions.closePositionByTarget);
         }
 
         public bool ValidateSuggestedPosition(int suggestedPosition)

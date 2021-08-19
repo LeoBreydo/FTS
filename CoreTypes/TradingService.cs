@@ -166,14 +166,11 @@ namespace CoreTypes
             ApplyNewTicks(so,ic);
             MakeNewOneMinuteBars(so, ic);
 
-            // TODO inject new bars (and ticks?) to indicator container
-            var newBars = ic.BarsInfo;
-            var newTicks = ic.TicksInfo;
 
             ProcessContractInfos(so, ic);
             ApplyOrderReports(so, ic);
             
-            SignalService.ProcessCurrentState(so.CurrentUtcTime, ic.NewBpvMms, newBars);
+            SignalService.ProcessCurrentState(so.CurrentUtcTime, ic.NewBpvMms, ic.BarsInfo, ic.TicksInfo);
 
             UpdateProfitLossInfos(so);
             UpdateParentRestrictions();
