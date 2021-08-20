@@ -293,27 +293,18 @@ namespace CoreTypes
             _currentRestriction = _restrictionsManager.GetCurrentRestriction();
         }
 
-        // call when CurrentOperationAmount is zero
+        // at moment of call
+        //  1) CurrentOperationAmount is zero
+        //  2) last signal cannot be NO_SIGNAL
+        //  3) _currentRestriction cannot be HardStop
         private void SetOrderSize()
         {
-            if (_lastSignal == Signal.TO_FLAT || _currentRestriction == TradingRestriction.HardStop)
-            {
+            if (_lastSignal == Signal.TO_FLAT)
                 CurrentOperationAmount = -Position.Size;
-                OffsetDealAmount = 0;
-                return;
-            }
-
-            if (_currentRestriction == TradingRestriction.SoftStop)
-            {
-                if (_lastSignal == Signal.TO_LONG)
-                    CurrentOperationAmount = Position.Size >= 0 ? OffsetDealAmount : -Position.Size;
-                else // last signal = Signal.TO_SHORT
-                    CurrentOperationAmount = Position.Size <= 0 ? OffsetDealAmount : -Position.Size;
-                OffsetDealAmount = 0;
-                return;
-            }
-
-            CurrentOperationAmount = ((int)_lastSignal) * ContractsNbr - Position.Size + OffsetDealAmount;
+            else // here _lastSignal can be only TO_LONG or TO_SHORT
+                CurrentOperationAmount = _currentRestriction == TradingRestriction.SoftStop
+                    ? -Position.Size
+                    : ((int) _lastSignal) * ContractsNbr - Position.Size + OffsetDealAmount;
             OffsetDealAmount = 0;
         }
 
@@ -341,7 +332,16 @@ namespace CoreTypes
                 return new StrategyOrderInfo(Id, 0);
             }
 
-            if (_lastSignal == Signal.NO_SIGNAL) // no signal at the moment
+            if (_currentRestriction == TradingRestriction.HardStop)
+            {
+                // we must close position
+                CurrentOperationAmount = -Position.Size;
+                OffsetDealAmount = 0;
+                _lastSignal = Signal.NO_SIGNAL;
+                return new StrategyOrderInfo(Id, CurrentOperationAmount);
+            }
+
+            if (_lastSignal == Signal.NO_SIGNAL) // no signal at the moment, we should check offset deal
             {
                 var amount = OffsetDealAmount != 0 ? OffsetDealAmount : 0;
                 OffsetDealAmount = 0;
