@@ -5,7 +5,7 @@ namespace CoreTypes.SignalServiceClasses
 {
     class ScaledTimeGridBarAggregator
     {
-        private readonly int _barSizeInMinutes, _synchronizationMinute;
+        private readonly int _barSizeInMinutes;
 
         private readonly Action<DateTime,double[]> EjectBar;
         private AggregatingBar mAggregatingBar;
@@ -17,10 +17,9 @@ namespace CoreTypes.SignalServiceClasses
 
             public double[] OHLC() { return new[] { O, H, L, C }; }
         }
-        public ScaledTimeGridBarAggregator(Action<DateTime,double[]> ejectBar, int barSizeInMinutes, int synchronizationMinute)
+        public ScaledTimeGridBarAggregator(Action<DateTime,double[]> ejectBar, int barSizeInMinutes)
         {
             _barSizeInMinutes = barSizeInMinutes;
-            _synchronizationMinute = synchronizationMinute;
             EjectBar = ejectBar;
 
         }
@@ -64,11 +63,13 @@ namespace CoreTypes.SignalServiceClasses
 
         private void SetBarTimes(DateTime tm)
         {
-            TimeFrameHelper.GetBarTimesM(_barSizeInMinutes, _synchronizationMinute, tm, out _, out mAggregatingBar.End);
+            TimeFrameHelper.GetBarTimesM(_barSizeInMinutes, 0, tm, out _, out mAggregatingBar.End);
         }
 
         private void EjectCurrentBar()
         {
+            var ohlc = mAggregatingBar.OHLC();
+            DebugLog.AddMsg(string.Format("EjectAggregatedBar ({0},{1},{2},{3},{4})", mAggregatingBar.End, ohlc[0], ohlc[1], ohlc[2], ohlc[3]));
             EjectBar(mAggregatingBar.End, mAggregatingBar.OHLC());
             mAggregatingBar = null;
         }
@@ -76,16 +77,14 @@ namespace CoreTypes.SignalServiceClasses
     class ScaledTimeGridTimeFrame
     {
         public readonly int BarSizeInMinutes;
-        public readonly int SynchronizationMinute;
         public TimeFrameData Data { get; }
         private readonly ScaledTimeGridBarAggregator Aggregator;
 
-        public ScaledTimeGridTimeFrame(int barSizeInMinutes, int synchronizationMinute=0)
+        public ScaledTimeGridTimeFrame(int barSizeInMinutes)
         {
             BarSizeInMinutes = barSizeInMinutes;
-            SynchronizationMinute = synchronizationMinute;
             Data = new TimeFrameData(100);
-            Aggregator = new ScaledTimeGridBarAggregator((end,ohlc) => Data.Push(end, ohlc),  barSizeInMinutes, synchronizationMinute);
+            Aggregator = new ScaledTimeGridBarAggregator((end,ohlc) => Data.Push(end, ohlc),  barSizeInMinutes);
         }
 
         public void ApplyBar(Bar barOneMin)

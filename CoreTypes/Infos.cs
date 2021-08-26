@@ -34,7 +34,7 @@ namespace CoreTypes
 
         public ContractInfo(ContractDetails cd)
         {
-            MarketName = cd.MarketName;
+            MarketName = cd.Contract.Symbol;//MarketName = cd.MarketName; // do not use cd.MarketName. Example: subsribed to BAKKT@ICECRYPTO, Symbol='BAKKT'; MarketName='BTM'; LocalSymbol(contract)='BTMU1'
             Exchange = cd.Contract.Exchange;
             LocalSymbol = cd.Contract.LocalSymbol;
             //yyyymmdd

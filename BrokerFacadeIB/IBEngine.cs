@@ -79,7 +79,7 @@ namespace BrokerFacadeIB
                 }
             }
 
-            var (tickInfos, contractInfos, barUpdates) = DataFeed.GetState();
+            var (tickInfos, contractInfos, barUpdates) = DataFeed.GetState(currentUtc);
             var orderReports = OrderFeed.GetState();
 
             return new StateObject(currentUtc,tickInfos,contractInfos,barUpdates,orderReports,tmList);

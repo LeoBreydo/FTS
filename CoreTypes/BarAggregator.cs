@@ -62,7 +62,7 @@ namespace CoreTypes
     public class BarAggregator
     {
         private readonly int _gapInMinutes;
-        private readonly XSecondsAggregationRules _rule;
+        private readonly MinuteAggregationRules _rule;
         public Bar Current { get; private set; }
 
         public string SymbolExchange { get; }
@@ -70,7 +70,7 @@ namespace CoreTypes
 
         private bool _newContract;
 
-        public BarAggregator(XSecondsAggregationRules rule, string symbolExchange, int gapInMinutes = int.MaxValue)
+        public BarAggregator(MinuteAggregationRules rule, string symbolExchange, int gapInMinutes = int.MaxValue)
         {
             _gapInMinutes = gapInMinutes < 1 ? 1 : gapInMinutes;
             _rule = rule ?? throw new Exception("rule is null");
@@ -190,4 +190,12 @@ namespace CoreTypes
             return (currentBar.End - currentBar.Start).TotalSeconds >= _seconds;
         }
     }
+    public class MinuteAggregationRules
+    {
+        public bool IsBarCompleted(Bar currentBar, DateTime currentTime, int gapInMinutes) =>
+            currentBar.Start.Minute != currentTime.Minute || (currentTime - currentBar.Start).TotalSeconds >= 60;
+
+        public bool IsBarCompleted(Bar currentBar)=> currentBar.End.Second == 0;
+    }
+
 }

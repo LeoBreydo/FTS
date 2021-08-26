@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using Binosoft.TraderLib.Indicators;
-using CoreTypes.SignalServiceClasses;
 using Indicators.Common;
 
 namespace CoreTypes.SignalServiceClasses
@@ -33,7 +32,7 @@ namespace CoreTypes.SignalServiceClasses
                     _indicatorsContainer.RefreshIndicators(currentTime);
                 return false;
             }
-
+            // new minute started
             _curMinute = currentTime.Minute;
             _dataStorage.ProcessEndOfMinute(currentTime);
             _indicatorsContainer.RefreshIndicators(currentTime);

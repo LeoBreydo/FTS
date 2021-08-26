@@ -30,7 +30,7 @@ namespace Driver
             TService = new TradingService(Configuration, GetStrategiesFolder());
             Client = new ClientCommunicationFacade();
             Scheduler = new Scheduler();
-            Logger = new(15, "./");
+            Logger = new(15, "Logs/"); //"./");
         }
 
         private static string GetStrategiesFolder()

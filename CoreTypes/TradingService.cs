@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using CoreTypes.SignalServiceClasses;
 using static CoreTypes.MessageStringProducer;
 
 
@@ -76,7 +77,7 @@ namespace CoreTypes
                 var key = mt.MarketCode + exchangeName;
                 _priceProviderMap.Add(key, mt.Position.PriceProvider);
                 _barAggregatorMap.Add(key, new BarAggregator(
-                    new XSecondsAggregationRules(60), mt.MarketCode + et.Exchange, 1));
+                    new MinuteAggregationRules(), mt.MarketCode + et.Exchange, 1));
                 _contractManagers.Add(key, mt.ContractManager);
             }
         }
@@ -292,6 +293,8 @@ namespace CoreTypes
                 var key = ci.MarketName + ci.Exchange;
                 if (_contractManagers.ContainsKey(key))
                     _contractManagers[key].SetNewContractInfo(ci, ic, so);
+                else
+                    DebugLog.AddMsg("Ignored processing of unexpected contract " + key);
             }
             foreach (var cm in _contractManagers.Values) cm.ProcessContractInfo(so.CurrentUtcTime, ic);
         }

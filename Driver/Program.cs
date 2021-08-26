@@ -1,9 +1,12 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Binosoft.TraderLib.Indicators;
 using BrokerFacadeIB;
+using CoreTypes;
+using CoreTypes.SignalServiceClasses;
 
 namespace Driver
 {
@@ -12,6 +15,7 @@ namespace Driver
         static void Main(string[] args)
         {
             ReadIBCredentials();
+            DebugLog.SetLocation(@"Logs/DebugLog.txt");
             IndicatorsServer.Init(GetIndicatorsFolder());
 
             var cancellationTokenSource = new CancellationTokenSource();
@@ -78,9 +82,11 @@ namespace Driver
         {
             return Task.Factory.StartNew((_) =>
                 {
+                    DebugLog.AddMsg("=========== START============");
                     var mo = new MainObject(_ibCredentials);
                     Thread.Sleep(1000);
-                    Console.WriteLine("Started?");
+                    Console.WriteLine("Started");
+                    Console.WriteLine("Press ENTER to stop TradingServer");
                     var ms = (int)Math.Floor(DateTime.UtcNow.TimeOfDay.TotalMilliseconds);
                     try
                     {
@@ -88,7 +94,6 @@ namespace Driver
                         {
                             if (cts.Token.IsCancellationRequested)
                             {
-                                //Console.WriteLine("Throwed");
                                 mo.PlaceStopRequest();
                                 var elapsedSeconds = 0;
                                 while (!mo.IsReadyToBeStooped)
@@ -120,16 +125,19 @@ namespace Driver
                                 ms += sleepTime;
                                 Thread.Sleep(sleepTime);
                             }
+                            DebugLog.Flush();
                         }
                     }
                     catch (TaskCanceledException e)
                     {
                         Console.WriteLine(e.Message);
+                        DebugLog.AddMsg("Exception " + e, true);
                     }
                     finally
                     {
                         cts.Dispose();
                     }
+                    DebugLog.AddMsg("============ DONE ===========",true);
                 }
                 , TaskCreationOptions.LongRunning
                 , cts.Token);

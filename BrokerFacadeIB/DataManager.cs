@@ -1,9 +1,11 @@
 ﻿#define USE_5S_BARS
+#define WORKWITH_DELAYED_DATA
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using CoreTypes;
+using CoreTypes.SignalServiceClasses;
 using IBApi;
 
 namespace BrokerFacadeIB
@@ -45,17 +47,88 @@ namespace BrokerFacadeIB
 #endif
         }
 
-
-        public (List<TickInfo>, List<ContractInfo>, List<Bar5s>) 
-            GetState()
+#if WORKWITH_DELAYED_DATA
+        class Bar5sBuilder
         {
+            public readonly string SymbolExchange;
+            public string ContractCode { get; private set; }
+
+            private bool IsBarStarted;
+            private DateTime Begin;
+            private double O, H, L, C;
+
+            public Bar5sBuilder(string symbolExchange)
+            {
+                SymbolExchange = symbolExchange;
+            }
+            public void ProcessTime(DateTime nextBarBegin, BlockingCollection<Bar5s> output)
+            {
+                if (IsBarStarted && nextBarBegin > Begin)
+                {
+                    output.Add(new Bar5s(SymbolExchange, ContractCode, O, H, L, C, Begin));
+                    IsBarStarted = false;
+                }
+            }
+            public void ProcessQuote(double quote, DateTime barBegin,string contractCode)
+            {
+                ContractCode = contractCode;
+
+                if (!IsBarStarted)
+                {
+                    IsBarStarted = true;
+                    O = H = L = C = quote;
+                    Begin = barBegin;
+                }
+                else
+                {
+                    H = Math.Max(H, quote);
+                    L = Math.Min(L, quote);
+                    C = quote;
+                }
+            }
+
+        }
+        private readonly List<Bar5sBuilder> _bar5sBuilders = new List<Bar5sBuilder>();
+
+        private Bar5sBuilder GetBar5sBuilder(TickInfo ti)
+        {
+            var ret = _bar5sBuilders.FirstOrDefault(item =>
+                item.SymbolExchange == ti.SymbolExchange);
+            if (ret == null)
+                _bar5sBuilders.Add(ret = new Bar5sBuilder(ti.SymbolExchange));
+            return ret;
+        }
+
+        private static DateTime GetS5BarBegin(DateTime time)
+        {
+            var sec = (int)Math.Floor(time.TimeOfDay.TotalSeconds / 5) * 5;
+            var barBegin = time.Date.AddSeconds(sec);
+            return barBegin;
+        }
+
+#endif
+        public (List<TickInfo>, List<ContractInfo>, List<Bar5s>) 
+            GetState(DateTime currentUtc)
+        {
+#if WORKWITH_DELAYED_DATA
+            DateTime tBegin5S = GetS5BarBegin(currentUtc);
+            // when working with delayed market data we have no subscription to 5sec bars. Emulate it using collected quotes
+            foreach (var bb in _bar5sBuilders)
+                bb.ProcessTime(currentUtc, _barsQueue);
+#endif
             var cnt = _quoteQueue.Count;
             var consumed = 0;
             List<TickInfo> qtList = new();
-            if (cnt > 0)
-                foreach (var ti in _quoteQueue.GetConsumingEnumerable())
+            if (cnt > 0) 
+                foreach (TickInfo ti in _quoteQueue.GetConsumingEnumerable())
                 {
                     qtList.Add(ti);
+                    if (ti.Tag == 4) // last price
+                    {
+                        GetBar5sBuilder(ti).ProcessQuote(ti.Value, tBegin5S, ti.ContractCode);
+                        //DebugLog.AddMsg(string.Format("Quote: {0} {1} {2} {3}", ti.SymbolExchange, ti.ContractCode, ti.Tag, ti.Value));
+                    }
+
                     if (++consumed == cnt) break;
                 }
 
@@ -79,6 +152,7 @@ namespace BrokerFacadeIB
                 foreach (var qu in _barsQueue.GetConsumingEnumerable())
                 {
                     barsList.Add(qu);
+                    //DebugLog.AddMsg(string.Format("5sBar: {0} {1} {2} {3} {4} {5} {6}", qu.SymbolExchange, qu.ContractCode, qu.BarOpenTime.ToString("yyyyMMdd-HHmmss"),qu.Open,qu.High,qu.Low,qu.Close));
                     if (++consumed == cnt) break;
                 }
             }
@@ -142,9 +216,23 @@ namespace BrokerFacadeIB
                 }
             }
 
+            var cd = contractDetails.Details;
+            var cdc = contractDetails.Details.Contract;
+            DebugLog.AddMsg(string.Format("_client_ContractDetails {0},{1},{2},{3},{4},{5},{6},{7}", 
+                contractDetails.ReqId,
+                cdc.Exchange,
+                cdc.Currency,
+                cdc.LocalSymbol,
+                cdc.Symbol,
+                cd.Category,
+                cd.MinTick,
+                cdc.Multiplier
+                ));
+
+
             _contractQueue.Add(contractDetails.Details);
         }
-#if DEBUG
+#if WORKWITH_DELAYED_DATA
         int TransformDelayedTagToMainTag(int field)
         {
             switch (field)
@@ -169,35 +257,40 @@ namespace BrokerFacadeIB
             }
 
         }
-#endif
+
         private void _client_TickPrice(TickPriceMessage tickPrice)
         {
-            //TODO uncomment next string when got a normal connection
-            //if (tickPrice.Field > 4) return;
+#if RELEASE
+#error This code is a patch to have the futures data stream from delayed quotation. Can not be used in production!!! Toggle off the conditional compilation key '#WORKWITH_DELAYED_DATA'
+#endif
+
             var field = TransformDelayedTagToMainTag(tickPrice.Field);
+            if (!_registry.TryGetValue(tickPrice.RequestId, out var info)) return;
+            _quoteQueue.Add(new TickInfo(info.symbolExchange, info.contractCode, field, tickPrice.Price));
+        }
 
-            if (!_registry.TryGetValue(tickPrice.RequestId,out var info)) return;
-
-            _quoteQueue.Add(new TickInfo(info.symbolExchange, field, tickPrice.Price));
-#if DEBUG
-            if (tickPrice.Field == 68) //delayed ask price:  subscription to 5s bars is not allowed in this mode, so make pseudo 5SecBar from last price to have 1min quotes stream in server
-                _barsQueue.Add(new Bar5s(info.symbolExchange, info.contractCode,
-                    tickPrice.Price, tickPrice.Price, tickPrice.Price, tickPrice.Price, DateTime.UtcNow));
+        private void _client_TickSize(TickSizeMessage tickSize)
+        {
+            var field = TransformDelayedTagToMainTag(tickSize.Field);
+            if (!_registry.TryGetValue(tickSize.RequestId,out var info)) return;
+            _quoteQueue.Add(new TickInfo(info.symbolExchange, info.contractCode, field, tickSize.Size));
+        }
 
 #else
-#error exclude the temporary functionaly
-#endif
+            private void _client_TickPrice(TickPriceMessage tickPrice)
+        {
+            if (tickPrice.Field > 4) return; // ignore delayed data
+            if (!_registry.TryGetValue(tickPrice.RequestId, out var info)) return;
+            _quoteQueue.Add(new TickInfo(info.symbolExchange, tickPrice.Field, tickPrice.Price));
         }
         private void _client_TickSize(TickSizeMessage tickSize)
         {
-            //TODO uncomment next string when got a normal connection
-            //if (tickSize.Field > 5) return;
-            var field = TransformDelayedTagToMainTag(tickSize.Field);
-
+            if (tickSize.Field > 5) return; // ignore delayed data
             if (!_registry.ContainsKey(tickSize.RequestId)) return;
             string symbolExchange = _registry[tickSize.RequestId].symbolExchange;
-            _quoteQueue.Add(new TickInfo(symbolExchange, field, tickSize.Size));
+            _quoteQueue.Add(new TickInfo(symbolExchange, tickSize.Field, tickSize.Size));
         }
+#endif
 
         private readonly DateTime _baseUnixTime = new(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
         private void _client_RealtimeBar(RealTimeBarMessage msg)
@@ -224,6 +317,7 @@ namespace BrokerFacadeIB
         private void RequestContractDetails(string contractCode, string exchange)
         {
             var ticker = GetNextTickerId();
+            DebugLog.AddMsg(string.Format("DM.RequestContractDetails, {0},{1}; tickerId={2}", contractCode, exchange, ticker));
             var cnt = new Contract
             {
                 Symbol = contractCode.ToUpper(),
@@ -242,12 +336,14 @@ namespace BrokerFacadeIB
                     : null;
                 if (contract == null)
                 {
+                    DebugLog.AddMsg(string.Format("DM.Subscribe to {0} failed - invalid contract info", symbolExchange));
                     AddMessage("WARNING", 
                         $"Invalid contract info used in subscription request ({symbolExchange})");
                     return;
                 }
 
                 var tickerId = GetNextTickerId();
+                DebugLog.AddMsg(string.Format("DM.Subscribe, {0}; tickerId={1}", symbolExchange, tickerId));
                 _registry.Add(tickerId,(symbolExchange, contract.LocalSymbol));
 
                 _client.ClientSocket.reqMarketDataType(3);
@@ -262,6 +358,7 @@ namespace BrokerFacadeIB
 
         public void handle_Error(int tickerId, int errorCode, string str)
         {
+            DebugLog.AddMsg(string.Format("handle_Error {0},{1}; tickerId={2}", errorCode, str, tickerId));
             lock (_lock)
             {
                 if (_registry.TryGetValue(tickerId,out var symbolExchange))
@@ -285,6 +382,7 @@ namespace BrokerFacadeIB
 
         private void Unsubscribe(string contractCode)
         {
+            DebugLog.AddMsg("DM.Unsubscribe, " + contractCode);
             lock (_lock)
             {
                 contractCode = contractCode.Trim().ToUpper();

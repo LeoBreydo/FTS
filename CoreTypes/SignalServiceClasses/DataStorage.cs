@@ -114,6 +114,15 @@ namespace CoreTypes.SignalServiceClasses
 
         public void AddMinuteBars(List<Tuple<Bar, string,bool>> newBars)
         {
+            DebugLog.AddMsg("AddMinuteBars " +
+                            string.Join("|",newBars.Select(t => string.Format("({0},{1},{2},{3},{4},{5},{6})", t.Item2,
+                                t.Item3,
+                                t.Item1.O,
+                                t.Item1.H,
+                                t.Item1.L,
+                                t.Item1.C,
+                                t.Item1.End.ToString("yyyyMMdd-HHmmss")
+                            ))));
             foreach (Tuple<Bar, string, bool> instrum_bar_newContractStarted in newBars)
             {
                 if (!_instruments.TryGetValue(instrum_bar_newContractStarted.Item2.ToUpper(), out var instrument)) 

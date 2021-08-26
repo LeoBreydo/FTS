@@ -35,7 +35,10 @@ namespace CoreTypes
                 {
                     string error = InitStrategy(mktcodeExchange, sc);
                     if (error != null)
+                    {
+                        DebugLog.AddMsg("StrategyInit failed: " + error,true);
                         return string.Format("Failed to create strategy {0}: {1}", sc.Id, error);
+                    }
                 }
             }
 
@@ -66,15 +69,18 @@ namespace CoreTypes
             if (_indicatorsFacade.ProcessCurrentState(currentTime,listOf_mxBpvMM, barValues))
             {
                 foreach (StrategyInfoHolder strategy in _strategies.Values)
-                    strategy.UpdateDecision(currentTime);
+                    strategy.UpdateDecision();
             }
 
         }
         public Signal GetSignal(int strategyID)
         {
-            return _strategies.TryGetValue(strategyID, out var strategy)
+            var ret= _strategies.TryGetValue(strategyID, out var strategy)
                 ? strategy.GetResetLastDecision()
                 : Signal.TO_FLAT;
+            if (ret != Signal.NO_SIGNAL)
+                DebugLog.AddMsg(string.Format("Strategy {0} returns new signal {1}", strategyID, ret));
+            return ret;
         }
 
         public void SetLastPrice(string mktcodeExchange, decimal price)
@@ -91,12 +97,20 @@ namespace CoreTypes
 
         public void ApplyNewMarketRestrictions(List<(string, TradingRestriction)> tCommands)
         {
+            if (tCommands?.Count > 0)
+                DebugLog.AddMsg("ApplyNewMarketRestrictions: " +
+                                string.Join(";", tCommands.Select(t => string.Format("{0} {1}", t.Item1, t.Item2))));
             _scheduleRestrictors.ApplyNewMarketRestrictions(tCommands);
         }
 
         public List<ICommand> GetCommands()
         {
-            return _scheduleRestrictors.GetCommands();
+            var ret= _scheduleRestrictors.GetCommands();
+            if (ret?.Count > 0)
+                DebugLog.AddMsg("SignalService.GetCommands returns: " + string.Join("; ",
+                    ret.Cast<RestrictionCommand>()
+                        .Select(r => string.Format("({0},{1})", r.DestinationId, r.Restriction))));
+            return ret;
         }
 
         private LastPriceHolder GetOrCreateLastPriceHolder(string mktcodeExchange)
@@ -111,7 +125,10 @@ namespace CoreTypes
             string error = CreateStrategy(strConfig, out IByMarketStrategy str);
             if (error != null) return error;
 
-            var indicatorExpressions = str.GetIndicatorExpressions().ToList();
+            List<string> indicatorExpressions = str.GetIndicatorExpressions().ToList();
+
+            int ixCloseIndicator = indicatorExpressions.Count;
+            indicatorExpressions.Add("Close");
 
             IDynamicGuard stopGuard=null;
             IDynamicGuard targetGuard = null;
@@ -157,7 +174,7 @@ namespace CoreTypes
 
 
             _strategies.Add(strConfig.Id,
-                new StrategyInfoHolder(str, indicators, strConfig.IgnoreTimeZones, dynamicGuards));
+                new StrategyInfoHolder(strConfig.Id, str, indicators, ixCloseIndicator, strConfig.IgnoreTimeZones, dynamicGuards));
             return null;
         }
 
