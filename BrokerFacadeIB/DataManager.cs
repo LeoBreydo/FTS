@@ -1,12 +1,16 @@
 ﻿#define USE_5S_BARS
-#define WORKWITH_DELAYED_DATA
+#define WORKWITH_DELAYED_DATA // a patch to have 5s bars while have no real access to market data: produces 5s bars from "quotes"
+
 using System;
+using System.Globalization;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using CoreTypes;
 using CoreTypes.SignalServiceClasses;
 using IBApi;
+using Bar = CoreTypes.Bar;
 
 namespace BrokerFacadeIB
 {
@@ -14,25 +18,32 @@ namespace BrokerFacadeIB
     {
         private const int START_TICKER_ID = 10000100;
         private readonly IBClient _client;
-        private readonly Dictionary<int, (string symbolExchange, string contractCode)> _registry = new();
-        private readonly Dictionary<int, (string symbolExchange, string contractCode)> _5sBars = new();
-        private readonly Dictionary<string, Contract> _symbolAndExchangeToContract;
+        //private readonly object _lock = new();
+
+        private readonly ConcurrentDictionary<int, (string symbolExchange, string contractCode)> _registry = new();
+        private readonly ConcurrentDictionary<int, (string symbolExchange, string contractCode)> _5sBars = new();
+        private readonly ConcurrentDictionary<int, (string symbolExchange, string contractCode)> _regHistoryRequests = new();
+        private readonly ConcurrentDictionary<string, Contract> _symbolAndExchangeToContract;
 
         private readonly BlockingCollection<TickInfo> _quoteQueue = new();
         private readonly BlockingCollection<ContractDetails> _contractQueue = new();
         private readonly BlockingCollection<Bar5s> _barsQueue = new();
         private readonly BlockingCollection<Tuple<string, string>> _textMessageQueue;
+        private readonly BlockingCollection<(string mktExch, Bar histbar, string contrCode)> _historicalBars=new ();
+        
 
         private void AddMessage(string tag, string message)
         {
             _textMessageQueue.Add(new Tuple<string, string>(tag, message));
+            DebugLog.AddMsg("DataManager: "+tag + "\t" + message);
+
         }
 
         private int _currentTickerId;
-        private int GetNextTickerId() { return ++_currentTickerId; }
+        private int GetNextTickerId() { return Interlocked.Increment(ref _currentTickerId); }
 
-        public DataManager(IBClient client, 
-            Dictionary<string, Contract> symbolAndExchangeToContract,
+        public DataManager(IBClient client,
+            ConcurrentDictionary<string, Contract> symbolAndExchangeToContract,
             BlockingCollection<Tuple<string, string>> textMessageQueue)
         {
             _client = client;
@@ -45,7 +56,9 @@ namespace BrokerFacadeIB
 #if USE_5S_BARS
             _client.RealtimeBar += _client_RealtimeBar;
 #endif
+            _client.HistoricalData += _client_HistoricalData;
         }
+
 
 #if WORKWITH_DELAYED_DATA
         class Bar5sBuilder
@@ -107,7 +120,7 @@ namespace BrokerFacadeIB
         }
 
 #endif
-        public (List<TickInfo>, List<ContractInfo>, List<Bar5s>) 
+        public (List<TickInfo>, List<ContractInfo>, List<Bar5s>,List<(string mktExch,Bar histbar,string contrCode)>) 
             GetState(DateTime currentUtc)
         {
 #if WORKWITH_DELAYED_DATA
@@ -123,12 +136,10 @@ namespace BrokerFacadeIB
                 foreach (TickInfo ti in _quoteQueue.GetConsumingEnumerable())
                 {
                     qtList.Add(ti);
+#if WORKWITH_DELAYED_DATA
                     if (ti.Tag == 4) // last price
-                    {
                         GetBar5sBuilder(ti).ProcessQuote(ti.Value, tBegin5S, ti.ContractCode);
-                        //DebugLog.AddMsg(string.Format("Quote: {0} {1} {2} {3}", ti.SymbolExchange, ti.ContractCode, ti.Tag, ti.Value));
-                    }
-
+#endif
                     if (++consumed == cnt) break;
                 }
 
@@ -152,13 +163,13 @@ namespace BrokerFacadeIB
                 foreach (var qu in _barsQueue.GetConsumingEnumerable())
                 {
                     barsList.Add(qu);
-                    //DebugLog.AddMsg(string.Format("5sBar: {0} {1} {2} {3} {4} {5} {6}", qu.SymbolExchange, qu.ContractCode, qu.BarOpenTime.ToString("yyyyMMdd-HHmmss"),qu.Open,qu.High,qu.Low,qu.Close));
                     if (++consumed == cnt) break;
                 }
             }
 
-            return (qtList, ciList, barsList);
+            return (qtList, ciList, barsList, _historicalBars.GetConsumingEnumerable().ToList());
         }
+
 
         // we should call this method at start of new day in timezone of the contracts of interest.
         public void PlaceRequest(List<(string,string)> contractCodesAndExchanges)
@@ -169,51 +180,43 @@ namespace BrokerFacadeIB
 
         public bool GetMarketCode(int id, out string marketCode)
         {
-            marketCode = null;
-            if (!_registry.ContainsKey(id)) return false;
-            marketCode = _registry[id].symbolExchange;
+            if (!_registry.TryGetValue(id, out var symbExch))
+            {
+                marketCode = null;
+                return false;
+            }
+            marketCode = symbExch.symbolExchange;
             return true;
         }
 
-        public bool GetContractCode(int id, out string contractCode)
-        {
-            contractCode = null;
-            if (!_registry.ContainsKey(id)) return false;
-            contractCode = _registry[id].contractCode;
-            return true;
-        }
-
-        private readonly object _lock = new();
         private void _client_ContractDetails(ContractDetailsMessage contractDetails)
         {
-            lock (_lock)
+            var key = contractDetails.Details.Contract.Symbol + contractDetails.Details.Contract.Exchange;
+            var cntr = new Contract
             {
-                var key = contractDetails.Details.Contract.Symbol + contractDetails.Details.Contract.Exchange;
-                var cntr = new Contract
+                SecType = "FUT",
+                Exchange = contractDetails.Details.Contract.Exchange,
+                Currency = contractDetails.Details.Contract.Currency,
+                LocalSymbol = contractDetails.Details.Contract.LocalSymbol,
+                Symbol = contractDetails.Details.Contract.Symbol
+            };
+
+            // if instrument is registered
+            if (_symbolAndExchangeToContract.TryGetValue(key, out var prevContract))
+            {
+                var previousCode = prevContract.LocalSymbol;
+                // if contract for a new delivery date detected
+                if (previousCode != contractDetails.Details.Contract.LocalSymbol)
                 {
-                    SecType = "FUT",
-                    Exchange = contractDetails.Details.Contract.Exchange,
-                    Currency = contractDetails.Details.Contract.Currency,
-                    LocalSymbol = contractDetails.Details.Contract.LocalSymbol,
-                    Symbol = contractDetails.Details.Contract.Symbol
-                };
-                // if instrument is registered
-                if (_symbolAndExchangeToContract.ContainsKey(key))
-                {
-                    var previousCode = _symbolAndExchangeToContract[key].LocalSymbol;
-                    // if contract for a new delivery date detected
-                    if (previousCode != contractDetails.Details.Contract.LocalSymbol)
-                    {
-                        _symbolAndExchangeToContract[key] = cntr;
-                        Unsubscribe(previousCode);
-                        Subscribe(key);
-                    }
-                }
-                else // new instrument detected
-                {
-                    _symbolAndExchangeToContract.Add(key, cntr);
+                    _symbolAndExchangeToContract[key] = cntr;
+                    Unsubscribe(previousCode);
                     Subscribe(key);
                 }
+            }
+            else // new instrument detected
+            {
+                _symbolAndExchangeToContract[key] = cntr;
+                Subscribe(key);
             }
 
             var cd = contractDetails.Details;
@@ -281,14 +284,14 @@ namespace BrokerFacadeIB
         {
             if (tickPrice.Field > 4) return; // ignore delayed data
             if (!_registry.TryGetValue(tickPrice.RequestId, out var info)) return;
-            _quoteQueue.Add(new TickInfo(info.symbolExchange, tickPrice.Field, tickPrice.Price));
+            _quoteQueue.Add(new TickInfo(info.symbolExchange, info.contractCode, tickPrice.Field, tickPrice.Price));
         }
         private void _client_TickSize(TickSizeMessage tickSize)
         {
             if (tickSize.Field > 5) return; // ignore delayed data
-            if (!_registry.ContainsKey(tickSize.RequestId)) return;
+            if (!_registry.TryGetValue(tickSize.RequestId, out var info)) return;
             string symbolExchange = _registry[tickSize.RequestId].symbolExchange;
-            _quoteQueue.Add(new TickInfo(symbolExchange, tickSize.Field, tickSize.Size));
+            _quoteQueue.Add(new TickInfo(symbolExchange, info.contractCode, tickSize.Field, tickSize.Size));
         }
 #endif
 
@@ -314,6 +317,31 @@ namespace BrokerFacadeIB
             _barsQueue.Add(new Bar5s(symbolExchange, contractCode,msg.Open,
                 msg.High, msg.Low, msg.Close, barOpenTime));
         }
+        private void _client_HistoricalData(int reqId, IBApi.Bar bar)
+        {
+            if (!_regHistoryRequests.TryGetValue(reqId, out var t)) return;
+            var (symbolExchange, contractCode) = t;
+
+
+            if (bar == null) // end of history
+            {
+                _historicalBars.Add(new(symbolExchange, null, contractCode));
+                _regHistoryRequests.Remove(reqId, out _); 
+            }
+            else
+                _historicalBars.Add(new(symbolExchange, ConvertMinuteBar(bar), contractCode));
+        }
+        private static Bar ConvertMinuteBar(IBApi.Bar bar)
+        {
+            if (bar == null) return null;
+
+            var openTime = DateTime.ParseExact(bar.Time, "yyyyMMdd  HH:mm:ss", null,
+                DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal);
+
+
+            return new Bar(bar.Open, bar.High, bar.Low, bar.Close, openTime, openTime.AddMinutes(1));
+        }
+
         private void RequestContractDetails(string contractCode, string exchange)
         {
             var ticker = GetNextTickerId();
@@ -329,100 +357,111 @@ namespace BrokerFacadeIB
 
         private void Subscribe(string symbolExchange)
         {
-            lock (_lock)
+            if (!_symbolAndExchangeToContract.TryGetValue(symbolExchange, out var contract))
             {
-                var contract = _symbolAndExchangeToContract.ContainsKey(symbolExchange)
-                    ? _symbolAndExchangeToContract[symbolExchange]
-                    : null;
-                if (contract == null)
-                {
-                    DebugLog.AddMsg(string.Format("DM.Subscribe to {0} failed - invalid contract info", symbolExchange));
-                    AddMessage("WARNING", 
-                        $"Invalid contract info used in subscription request ({symbolExchange})");
-                    return;
-                }
-
-                var tickerId = GetNextTickerId();
-                DebugLog.AddMsg(string.Format("DM.Subscribe, {0}; tickerId={1}", symbolExchange, tickerId));
-                _registry.Add(tickerId,(symbolExchange, contract.LocalSymbol));
-
-                _client.ClientSocket.reqMarketDataType(3);
-                _client.ClientSocket.reqMktData(tickerId, contract, string.Empty, false, false, null);
-
-                tickerId = GetNextTickerId();
-                _5sBars.Add(tickerId, (symbolExchange, contract.LocalSymbol));
-                _client.ClientSocket.reqMarketDataType(3);
-                _client.ClientSocket.reqRealTimeBars(tickerId, contract, 5, "TRADES", true, null);
+                AddMessage("WARNING", $"Invalid symbolExchange used in subscription request ({symbolExchange})");
+                return;
             }
+
+            var tickerId = GetNextTickerId();
+            DebugLog.AddMsg(string.Format("DM.Subscribe, {0}; tickerId={1}", symbolExchange, tickerId));
+            _registry[tickerId] = (symbolExchange, contract.LocalSymbol);
+
+            _client.ClientSocket.reqMarketDataType(3);
+            _client.ClientSocket.reqMktData(tickerId, contract, string.Empty, false, false, null);
+
+            tickerId = GetNextTickerId();
+            _5sBars[tickerId] = (symbolExchange, contract.LocalSymbol);
+            _client.ClientSocket.reqMarketDataType(3);
+            _client.ClientSocket.reqRealTimeBars(tickerId, contract, 5, "TRADES", true, null);
+
+
+            QueryHistoricalData(symbolExchange);// todo!!! temporary call. Should be an explicit call from interested party
+        }
+
+        public void QueryHistoricalData(string symbolExchange)
+        {
+            if (!_symbolAndExchangeToContract.TryGetValue(symbolExchange, out var contract))
+            {
+                AddMessage("WARNING", $"Invalid symbolExchange used in historical data request ({symbolExchange})");
+                return;
+            }
+
+            var tickerId = GetNextTickerId();
+            _regHistoryRequests[tickerId] = (symbolExchange, contract.LocalSymbol);
+            var end = GetBeginOfMinute(DateTime.UtcNow).ToString("yyyyMMdd HH:mm:ss"); // nearest border of the requested data converted to used format 
+            _client.ClientSocket.reqHistoricalData(tickerId, contract, end,
+                "1 W", "1 min", "TRADES", 1, 1, false, null);
+        }
+
+        private static DateTime GetBeginOfMinute(DateTime t)
+        {
+            return new DateTime(t.Year, t.Month, t.Day, t.Hour, t.Minute, 0, t.Kind);
         }
 
         public void handle_Error(int tickerId, int errorCode, string str)
         {
             DebugLog.AddMsg(string.Format("handle_Error {0},{1}; tickerId={2}", errorCode, str, tickerId));
-            lock (_lock)
+
+            if (_registry.Remove(tickerId, out var symbolExchange_contractcode))
             {
-                if (_registry.TryGetValue(tickerId,out var symbolExchange))
-                {
-                    AddMessage("ERROR",
-                        $"Subscription to IB marketCode {symbolExchange} failed, ErrorCode={errorCode}, Msg={str}");
-                }
-                else if (_5sBars.TryGetValue(tickerId, out symbolExchange))
-                {
-                    AddMessage("ERROR",
-                        $"Subscription to IB 5Sec_Bars marketCode {symbolExchange} failed, ErrorCode={errorCode}, Msg={str}");
-                }
-#if !tmp_Fulloutput // to save all error messages while application is not tested carefully
-                else
-                {
-                    AddMessage("IBDEBUG", $"common msg handle_Error: tickerId={tickerId}, errorCode={errorCode}, str={str}");
-                }
+                AddMessage("ERROR",
+                    $"Subscription to {symbolExchange_contractcode.symbolExchange} contract {symbolExchange_contractcode} failed, ErrorCode={errorCode}, Msg={str}");
             }
-#endif
+            else if (_5sBars.Remove(tickerId, out symbolExchange_contractcode))
+            {
+                AddMessage("ERROR",
+                    $"Subscription to 5Sec_Bars {symbolExchange_contractcode.symbolExchange} contract {symbolExchange_contractcode} failed, ErrorCode={errorCode}, Msg={str}");
+            }
+            else if (_regHistoryRequests.Remove(tickerId, out symbolExchange_contractcode))
+            {
+                _historicalBars.Add(new(symbolExchange_contractcode.symbolExchange, null, symbolExchange_contractcode.contractCode));
+
+                AddMessage("ERROR",
+                    $"Failed to load historical market data for {symbolExchange_contractcode.symbolExchange}, Contract={symbolExchange_contractcode.contractCode}. Msg={str}");
+            }
         }
 
         private void Unsubscribe(string contractCode)
         {
             DebugLog.AddMsg("DM.Unsubscribe, " + contractCode);
-            lock (_lock)
+
+            contractCode = contractCode.Trim().ToUpper();
+            var ticker = -1;
+            foreach (var kvp in _registry.Where(kvp => kvp.Value.contractCode == contractCode))
             {
-                contractCode = contractCode.Trim().ToUpper();
-                var ticker = -1;
-                foreach (var kvp in _registry.Where(kvp => kvp.Value.contractCode == contractCode))
-                {
-                    ticker = kvp.Key;
-                    break;
-                }
-                if (ticker == -1) return;
-                _registry.Remove(ticker);
-                _client.ClientSocket.cancelMktData(ticker);
+                ticker = kvp.Key;
+                break;
+            }
+            if (ticker == -1) return;
+
+            _registry.Remove(ticker, out _);
+            _client.ClientSocket.cancelMktData(ticker);
 
 
-                var tickList = new List<int>();
-                var foundSoFar = 0;
-                foreach (var kvp in _5sBars.Where(kvp => kvp.Value.contractCode == contractCode))
-                {
-                    tickList.Add(kvp.Key);
-                    if (++foundSoFar == 3) break;
-                }
-                foreach (var t in tickList)
-                {
-                    _5sBars.Remove(t);
-                    _client.ClientSocket.cancelRealTimeBars(t);
-                }
-
+            var tickList = new List<int>();
+            var foundSoFar = 0;
+            foreach (var kvp in _5sBars.Where(kvp => kvp.Value.contractCode == contractCode))
+            {
+                tickList.Add(kvp.Key);
+                if (++foundSoFar == 3) break;
+            }
+            foreach (var t in tickList)
+            {
+                _5sBars.Remove(t, out _);
+                _client.ClientSocket.cancelRealTimeBars(t);
             }
         }
 
         public void UnsubscribeAll()
         {
-            lock (_lock)
-            {
-                foreach (var ticker in _registry.Select(kvp => kvp.Key))
-                    _client.ClientSocket.cancelMktData(ticker);
+            foreach (var ticker in _registry.Select(kvp => kvp.Key).ToArray())
+                _client.ClientSocket.cancelMktData(ticker);
 
-                foreach (var t in _5sBars.Keys) _client.ClientSocket.cancelRealTimeBars(t);
-                ClearState();
-            }
+            foreach (var t in _5sBars.Keys.ToArray())
+                _client.ClientSocket.cancelRealTimeBars(t);
+
+            ClearState();
         }
 
         public void ClearState()
@@ -435,17 +474,15 @@ namespace BrokerFacadeIB
         ~DataManager()
         {
             UnsubscribeAll();
-            lock (_lock)
-            {
-                _quoteQueue?.CompleteAdding();
-                _quoteQueue?.Dispose();
 
-                _contractQueue?.CompleteAdding();
-                _contractQueue?.Dispose();
+            _quoteQueue?.CompleteAdding();
+            _quoteQueue?.Dispose();
 
-                _barsQueue?.CompleteAdding();
-                _barsQueue?.Dispose();
-            }
+            _contractQueue?.CompleteAdding();
+            _contractQueue?.Dispose();
+
+            _barsQueue?.CompleteAdding();
+            _barsQueue?.Dispose();
         }
     }
 

@@ -112,30 +112,42 @@ namespace CoreTypes.SignalServiceClasses
                 instrument.UpdateSettings(currentTime, bpv, minMove);
         }
 
-        public void AddMinuteBars(List<Tuple<Bar, string,bool>> newBars)
+        public void AddMinuteBars(List<Tuple<Bar, string,bool,string>> newBars)
         {
-            DebugLog.AddMsg("AddMinuteBars " +
-                            string.Join("|",newBars.Select(t => string.Format("({0},{1},{2},{3},{4},{5},{6})", t.Item2,
-                                t.Item3,
-                                t.Item1.O,
-                                t.Item1.H,
-                                t.Item1.L,
-                                t.Item1.C,
-                                t.Item1.End.ToString("yyyyMMdd-HHmmss")
-                            ))));
-            foreach (Tuple<Bar, string, bool> instrum_bar_newContractStarted in newBars)
+            if (DebugLog.IsWorking)
             {
-                if (!_instruments.TryGetValue(instrum_bar_newContractStarted.Item2.ToUpper(), out var instrument)) 
-                    continue; // todo ? to logout msg about data received for unknown instrument
-                if (instrum_bar_newContractStarted.Item3)
-                    instrument.StartNewContract();
-                instrument.AddMinuteBar(instrum_bar_newContractStarted.Item1);
+                DebugLog.AddMsg("AddMinuteBars " +
+                                string.Join("|", newBars.Select(t => string.Format("({0},{1},{2},{3},{4},{5},{6})",
+                                    t.Item2,
+                                    t.Item4,
+                                    t.Item1.O,
+                                    t.Item1.H,
+                                    t.Item1.L,
+                                    t.Item1.C,
+                                    t.Item1.End.ToString("yyyyMMdd-HHmmss")
+                                ))));
+            }
+
+            foreach (Tuple<Bar, string, bool,string> tuple in newBars)
+            {
+                if (!_instruments.TryGetValue(tuple.Item2.ToUpper(), out var instrument)) 
+                {
+                    if (DebugLog.IsWorking)
+                        DebugLog.AddMsg($"Ignored minute bar for unknown instrument {tuple.Item2} {tuple.Item1.End.ToString("yyyyMMdd-HHmmss")} ");
+
+                    continue; 
+
+                }
+                instrument.AddMinuteBar(tuple.Item1, tuple.Item4);
             }
         }
-        public void ProcessEndOfMinute(DateTime time)
+
+        public void ProcessTime(DateTime currentTime)
         {
+            const int maxPossibleDataDelayInSeconds = 60;
+            var reachedTime = currentTime.AddSeconds(-maxPossibleDataDelayInSeconds);
             foreach (var instruments in _instruments.Values)
-                instruments.ProcessTime(time);
+                instruments.ProcessTime(reachedTime);
         }
 
     }

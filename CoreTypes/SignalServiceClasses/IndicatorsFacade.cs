@@ -18,25 +18,31 @@ namespace CoreTypes.SignalServiceClasses
 
         }
         private int _curMinute = -1;
-        public bool ProcessCurrentState(DateTime currentTime, List<(string, int, double)> listOf_mxBpvMM, List<Tuple<Bar, string, bool>> barValues)
-        {
-            foreach (var mxBpvMM in listOf_mxBpvMM)
-                _dataStorage.UpdateSettings(currentTime, mxBpvMM.Item1, mxBpvMM.Item2, mxBpvMM.Item3);
 
-            if (barValues.Count > 0)
+        public bool ProcessCurrentState(DateTime currentTime, List<(string, int, double)> newBpvMms,
+            List<Tuple<Bar, string, bool, string>> barValues)
+        {
+            if (newBpvMms != null)
+                foreach (var mxBpvMM in newBpvMms)
+                    _dataStorage.UpdateSettings(currentTime, mxBpvMM.Item1, mxBpvMM.Item2, mxBpvMM.Item3);
+
+            if (barValues?.Count > 0)
                 _dataStorage.AddMinuteBars(barValues);
 
+            bool endOfMinute = false;
             if (currentTime.Minute == _curMinute)
             {
-                if (listOf_mxBpvMM.Count > 0)
-                    _indicatorsContainer.RefreshIndicators(currentTime);
-                return false;
+                _curMinute = currentTime.Minute;
+                _dataStorage.ProcessTime(currentTime);
+                endOfMinute = true;
             }
-            // new minute started
-            _curMinute = currentTime.Minute;
-            _dataStorage.ProcessEndOfMinute(currentTime);
-            _indicatorsContainer.RefreshIndicators(currentTime);
-            return true;
+
+            if (newBpvMms?.Count > 0 || barValues?.Count > 0 || endOfMinute)
+            {
+                _indicatorsContainer.RefreshIndicators(currentTime);
+                return true;
+            }
+            return false;
         }
 
 

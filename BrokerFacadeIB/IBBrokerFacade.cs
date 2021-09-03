@@ -34,6 +34,7 @@ namespace BrokerFacadeIB
             SetState(EStates.Inactive);
             _attempt = 0;
         }
+
         public StateObject GetState(DateTime currentUtc)
         {
             SecondPulse();

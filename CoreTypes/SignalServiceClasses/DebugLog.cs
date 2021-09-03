@@ -17,18 +17,27 @@ namespace CoreTypes.SignalServiceClasses
 
         private static readonly  List<string> _messages = new List<string>();
 
+#if DEBUG
+        public const bool IsWorking=true;
+#else
+        public const bool IsWorking=false;
+#endif
+
         public static void AddMsg(string txt,bool forceFlush=false)
         {
+#if DEBUG
             lock (_messages)
             {
                 _messages.Add(string.Format("{0} {1}", DateTime.UtcNow.ToString("yyyyMMdd-HHmmss.fff"), txt));
                 if (forceFlush)
                     Flush();
             }
+#endif
         }
 
         public static void Flush()
         {
+#if DEBUG
             lock (_messages)
             {
                 if (_messages.Count > 0)
@@ -37,6 +46,7 @@ namespace CoreTypes.SignalServiceClasses
                     _messages.Clear();
                 }
             }
+#endif
         }
     }
 }

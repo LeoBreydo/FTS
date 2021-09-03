@@ -56,17 +56,25 @@ namespace CoreTypes.SignalServiceClasses
                 MinmoveHolder.Push(currentTime, new[] { _minMove });
             }
         }
-        public void AddMinuteBar(Bar bar)
+
+        private string _currentContract = string.Empty;
+        public void AddMinuteBar(Bar bar,string contractCode)
         {
+            if (_currentContract != contractCode)
+            {
+                _currentContract = contractCode;
+                StartNewContract();
+            }
+
             MinTimeFrame.Push(bar.End, new[] { bar.O, bar.H, bar.L, bar.C });
             foreach (var scaledTf in ScaledTimeframes)
                 scaledTf.ApplyBar(bar);
         }
 
-        public void ProcessTime(DateTime time)
+        public void ProcessTime(DateTime reachedTime)
         {
             foreach (var scaledTf in ScaledTimeframes)
-                scaledTf.ProcessTime(time);
+                scaledTf.ProcessTime(reachedTime);
 
         }
         public void StartNewContract()

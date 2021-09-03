@@ -9,7 +9,6 @@ namespace BrokerFacadeIB
 {
     public class TwsActivator
     {
-        //private const int MAX_ATTEMPTS__TO_START = 3;
         private const int LIMIT_IN_SEC__FOR_MAINWNDTITLE__When_Initializing = 60;
         private const int NUM_SEC__Wait_While_ProcessLost = 60;
 
@@ -36,16 +35,12 @@ namespace BrokerFacadeIB
         private Action<string, string> _actionAddMessage = (_, _) => { };
         private void InitLogout(Action<string, string> actionAddMessage)
         {
-            if (actionAddMessage == null)
-                _actionAddMessage = (_, _) => { };
-            else
-                _actionAddMessage = actionAddMessage;
+            _actionAddMessage = actionAddMessage ?? ((_, _) => { });
         }
-        private void Logout(string txt, bool sendMessageToUser)
+        private void Logout(string txt)
         {
-            _actionAddMessage("TwsActivator", txt);
-            if (sendMessageToUser)
-                _actionAddMessage("CLIENT", txt);
+            _actionAddMessage("CLIENT", txt); // send message to client
+            DebugLog(txt); // output to log file
         }
 
         private static readonly object _Lock_LogFile = new object();
@@ -54,7 +49,7 @@ namespace BrokerFacadeIB
 #if DEBUG
             lock (_Lock_LogFile)
             {
-                File.AppendAllText("TwsActivatorLogout.txt",
+                File.AppendAllText("Logs/TwsActivatorLogout.txt",
                     DateTime.UtcNow.ToString("yyyyMMdd-HH:mm:ss.fff ") + txt + "\r\n");
             }
 #endif
@@ -90,8 +85,6 @@ namespace BrokerFacadeIB
         private State _state;
         private Process _twsProcess;
 
-        //private int _attemptsToStart;
-        //private int _backCounter;
         private int _counter;
         private string _lastTitle;
         private void StartTask()
@@ -154,9 +147,8 @@ namespace BrokerFacadeIB
             {
                 //case State.Inactive:
                 //    break;
-                case State.Working:
-                    //_attemptsToStart = 0;
-                    break;
+                //case State.Working:
+                //    break;
 
                 case State.ProcessLost:
                     Init_ProcessLostState();
@@ -207,16 +199,8 @@ namespace BrokerFacadeIB
             if (_counter >= LIMIT_IN_SEC__FOR_MAINWNDTITLE__When_Initializing) // if initialization hangs at any stage 
             {
                 _twsProcess.TryKillProcess();
-                Logout(string.Format("TWS hangs detected at initialization stage (title='{0}')", _lastTitle), true);
+                Logout(string.Format("TWS hang detected at initialization stage (title='{0}')", _lastTitle));
                 SetState(State.Inactive);
-
-                //++_attemptsToStart;
-                // this limitation is removed: a network problem will lead to such failure but in this case attempts should be continued by default until explicit user command
-                //if (_attemptsToStart >= MAX_ATTEMPTS__TO_START)
-                //{
-                //    Logout(string.Format("TWS Activator stopped after {0} attempts to start TWS!!!", _attemptsToStart),  true);
-                //    Stop();
-                //}
             }
         }
 
@@ -280,14 +264,11 @@ namespace BrokerFacadeIB
             }
             return workingProc;
         }
-
-
         private void LaunchTws()
         {
             DebugLog("LaunchTws");
             try
             {
-                //var clientInfo = new { ClientLocation = _location, Login = _login, Password = _password };
                 var startInfo =
                     new ProcessStartInfo(_location,
                         string.Format("username={0} password={1}", _login, _password))
@@ -305,7 +286,7 @@ namespace BrokerFacadeIB
             }
             catch (Exception e)
             {
-                Logout("Failed to start TWS!!! : " + e, true);
+                Logout("Failed to start TWS!!! : " + e);
                 SetState(State.Inactive);
                 Stop();
             }
@@ -322,7 +303,6 @@ namespace BrokerFacadeIB
 
             try
             {
-                //_twsProcess = _twsProcess.HasExited ? null : Process.GetProcessById(_twsProcess.Id);
                 if (_twsProcess.HasExited)
                     _twsProcess = null;
             }
@@ -333,7 +313,6 @@ namespace BrokerFacadeIB
 
             if (_twsProcess == null)
             {
-                // Logout("TwsActivator: TWS application is lost", false); // todo this notification should be sent from state ProcessLost after the timeout?nope
                 SetState(State.ProcessLost);
             }
         }

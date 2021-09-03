@@ -46,7 +46,7 @@ namespace BrokerFacadeIB
             _client.Error += handle_Error;
             _client.ConnectionClosed += handle_ConnectionClosed;
 
-            Dictionary<string, Contract> symbolAndExchangeToContract = new();
+            ConcurrentDictionary<string, Contract> symbolAndExchangeToContract = new();
 
             DataFeed = new DataManager(_client, symbolAndExchangeToContract, _textMsgQueue);
             OrderFeed = new OrdersManager(_client, symbolAndExchangeToContract, _textMsgQueue);
@@ -79,7 +79,7 @@ namespace BrokerFacadeIB
                 }
             }
 
-            var (tickInfos, contractInfos, barUpdates) = DataFeed.GetState(currentUtc);
+            var (tickInfos, contractInfos, barUpdates, historicalData) = DataFeed.GetState(currentUtc); // todo to transfer outside the historical data
             var orderReports = OrderFeed.GetState();
 
             return new StateObject(currentUtc,tickInfos,contractInfos,barUpdates,orderReports,tmList);
@@ -92,7 +92,6 @@ namespace BrokerFacadeIB
         }
         public bool IsStarted { get; private set; }
         private bool _subscriptionError;
-
         public bool Start()
         {
             if (IsStarted)
@@ -127,9 +126,9 @@ namespace BrokerFacadeIB
                 {
                     while (_client.ClientSocket.IsConnected())
                     {
-                        signal.waitForSignal();
+                        signal.waitForSignal(); // <-- HERE was detected a hang; Because of that was set the timeout when wait for join this thread
                         reader.processMsgs();
-                        if (ltcs.Token.IsCancellationRequested)
+                        if (ltcs.Token.IsCancellationRequested || _listenerThread!=Thread.CurrentThread)
                             break;
                     }
 
@@ -252,18 +251,21 @@ namespace BrokerFacadeIB
             _client.ClientSocket.eDisconnect();
 
             var thread = _listenerThread;
-            _listenerThread = null;
             try
             {
                 if (thread != null)
                 {
                     _lcts?.Cancel();
-                    thread.Join();
+                    thread.Join(15000);   // <-- HERE was detected a hang because of hang in listener thread when called out of params
                 }
             }
             catch  // avoid the exception "Thread is not started"
             {
             }
+            _listenerThread = null;
+            _lcts?.Dispose();
+            _lcts = null;
+
             IsStarted = false;
             IsConnectionEstablished = false;
             _conn_deconn_time = DateTime.UtcNow.ToString("yyyyMMdd:HHmmss");
@@ -274,7 +276,6 @@ namespace BrokerFacadeIB
 
             SendDisconnectionMessages(disconnectionReason, disconnectionDetails);
            AddMessage("INFO","Stopped by reason " + disconnectionReason);
-           _lcts?.Dispose();
         }
 
         public void SecondPulse()

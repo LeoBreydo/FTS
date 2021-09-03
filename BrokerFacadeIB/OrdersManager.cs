@@ -27,7 +27,7 @@ namespace BrokerFacadeIB
         private readonly Queue<MarketOrderDescription> _waitingOrders = new ();
         private bool _forceUpdateNextIdTime = true;
 
-        private readonly Dictionary<string, Contract> _symbolAndExchangeToContract;
+        private readonly ConcurrentDictionary<string, Contract> _symbolAndExchangeToContract;
 
         class OrderInfo
         {
@@ -56,8 +56,8 @@ namespace BrokerFacadeIB
         private long _secondsCount;
         private int _nextOrderId;
 
-        public OrdersManager(IBClient client, 
-            Dictionary<string, Contract> symbolAndExchangeToContract,
+        public OrdersManager(IBClient client,
+            ConcurrentDictionary<string, Contract> symbolAndExchangeToContract,
             BlockingCollection<Tuple<string, string>> textMessageQueue)
         {
             _client = client;
@@ -265,10 +265,9 @@ namespace BrokerFacadeIB
             var qty = Math.Abs(order.SignedContractsNbr);
             var clientOrderId = order.ClOrdId;
             var key = order.Symbol + order.Exchange;
-            if (!_symbolAndExchangeToContract.ContainsKey(key))
+            if (!_symbolAndExchangeToContract.TryGetValue(key,out var contract))
                 return;
 
-            var contract = _symbolAndExchangeToContract[key];
             var o = new Order
             {
                 Action = action,

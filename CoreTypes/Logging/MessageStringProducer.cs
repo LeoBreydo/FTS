@@ -17,12 +17,12 @@ namespace CoreTypes
 
         public static string MarketOrderDescriptionStringFormat => "# ClOrderId,Symbol,Exchange,Size";
 
-        public static string BarInfoString(Bar b, string symbolExchange, bool isNewContract) =>
-            $"{symbolExchange},{b.O},{b.H},{b.L},{b.C},{b.Start:yyyyMMdd:HHmmss},{b.End:yyyyMMdd:HHmmss},{isNewContract}";
+        public static string BarInfoString(Bar b, string symbolExchange, string contractCode) =>
+            $"{symbolExchange},{b.O},{b.H},{b.L},{b.C},{b.Start:yyyyMMdd:HHmmss},{b.End:yyyyMMdd:HHmmss},{contractCode}";
 
         public static string BarInfoStringFormat => 
             "# SymbolExchange,Open,High,Low,Close," +
-            "StartOfBar:yyyyMMdd:HHmmss,EndOfBar:yyyyMMdd:HHmmss,IsNewContract";
+            "StartOfBar:yyyyMMdd:HHmmss,EndOfBar:yyyyMMdd:HHmmss,ContractCode";
 
         public static string PriceProviderString(PriceProviderInfo pp, DateTime utcNow, string symbolExchange) => 
             $"{symbolExchange},{utcNow:yyyyMMdd:HHmmss},{pp.Bid},{pp.Ask},{pp.Last},{pp.BSize},{pp.ASize},{pp.LSize}";

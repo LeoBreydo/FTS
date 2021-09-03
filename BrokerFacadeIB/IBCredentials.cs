@@ -50,7 +50,6 @@ namespace BrokerFacadeIB
             {
                 return exception.Message;
             }
-
         }
     }
 }

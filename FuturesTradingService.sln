@@ -11,6 +11,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CoreTypes", "CoreTypes\Core
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Driver", "Driver\Driver.csproj", "{680708D2-2AFB-4402-A3D2-25CFE19FA94A}"
 EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FTS", "FTS\FTS.csproj", "{5A831696-1B4F-4E26-BB0A-24F51EF75CE1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{680708D2-2AFB-4402-A3D2-25CFE19FA94A}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{680708D2-2AFB-4402-A3D2-25CFE19FA94A}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{680708D2-2AFB-4402-A3D2-25CFE19FA94A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5A831696-1B4F-4E26-BB0A-24F51EF75CE1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5A831696-1B4F-4E26-BB0A-24F51EF75CE1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5A831696-1B4F-4E26-BB0A-24F51EF75CE1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5A831696-1B4F-4E26-BB0A-24F51EF75CE1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

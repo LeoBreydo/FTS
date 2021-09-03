@@ -59,14 +59,14 @@ namespace CoreTypes
             return new() {mkt.MCX()};
         }
         #endregion
-        public void ProcessCurrentState(DateTime currentTime, List<(string, int, double)> listOf_mxBpvMM, 
-            List<Tuple<Bar, string, bool>> barValues,
+        public void ProcessCurrentState(DateTime currentTime, List<(string, int, double)> newBpvMms, 
+            List<Tuple<Bar, string, bool, string>> barValues,
             List<(string mktExch, PriceProviderInfo ppi)> tickInfos)
         {
             foreach (var tickInfo in tickInfos)
                 SetLastPrice(tickInfo.mktExch, tickInfo.ppi.Last);
 
-            if (_indicatorsFacade.ProcessCurrentState(currentTime,listOf_mxBpvMM, barValues))
+            if (_indicatorsFacade.ProcessCurrentState(currentTime,newBpvMms, barValues))
             {
                 foreach (StrategyInfoHolder strategy in _strategies.Values)
                     strategy.UpdateDecision();

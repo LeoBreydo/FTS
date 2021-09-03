@@ -25,9 +25,9 @@ namespace CoreTypes.SignalServiceClasses
         }
 
         // returns true if new bar completed
-        public bool ProcessTime(DateTime time)
+        public bool ProcessTime(DateTime reachedTime)
         {
-            if (mAggregatingBar == null || time < mAggregatingBar.End) return false;
+            if (mAggregatingBar == null || reachedTime < mAggregatingBar.End) return false;
             EjectCurrentBar();
             return true;
         }
@@ -92,9 +92,9 @@ namespace CoreTypes.SignalServiceClasses
             Aggregator.ProcessBar(barOneMin);
         }
 
-        public bool ProcessTime(DateTime time)
+        public bool ProcessTime(DateTime reachedTime)
         {
-            return Aggregator.ProcessTime(time);
+            return Aggregator.ProcessTime(reachedTime);
         }
         public void Reset()
         {

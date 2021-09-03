@@ -53,7 +53,7 @@ namespace BrokerFacadeIB
                 scPost(() => tmp(id, errorCode, errorMsg, null));
         }
 
-        public event Action ConnectionClosed; // !
+        public event Action ConnectionClosed;
 
         void EWrapper.connectionClosed()
         {
@@ -307,22 +307,20 @@ namespace BrokerFacadeIB
             //    scPost(() => tmp(new FundamentalsMessage(data)), null);           
         }
 
-        //public event Action<HistoricalDataMessage> HistoricalData;
+        public event Action<int,Bar> HistoricalData;
 
         void EWrapper.historicalData(int reqId, Bar bar)
         {
-            //var tmp = HistoricalData;
-            //if (tmp != null)
-            //    scPost(() => tmp(new HistoricalDataMessage(reqId, bar)), null);            
+            var tmp = HistoricalData;
+            if (tmp != null)
+                scPost(() => tmp(reqId, bar));
         }
-
-        //public event Action<HistoricalDataEndMessage> HistoricalDataEnd;
 
         void EWrapper.historicalDataEnd(int reqId, string startDate, string endDate)
         {
-            //var tmp = HistoricalDataEnd;
-            //if (tmp != null)
-            //    scPost(() => tmp(new HistoricalDataEndMessage(reqId, startDate, endDate)), null);            
+            var tmp = HistoricalData;
+            if (tmp != null)
+                scPost(() => tmp(reqId, null)); // uses null as a sign of end of history
         }
 
         public event Action<MarketDataTypeMessage> MarketDataType;
