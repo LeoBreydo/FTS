@@ -60,7 +60,7 @@ namespace CoreTypes
         }
         #endregion
         public void ProcessCurrentState(DateTime currentTime, List<(string, int, double)> newBpvMms, 
-            List<Tuple<Bar, string, bool, string>> barValues,
+            List<Tuple<Bar, string, string>> barValues,
             List<(string mktExch, PriceProviderInfo ppi)> tickInfos)
         {
             foreach (var tickInfo in tickInfos)

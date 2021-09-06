@@ -301,7 +301,7 @@ namespace CoreTypes
         private void MakeNewOneMinuteBars(StateObject so, InfoCollector ic)
         {
             HashSet<string> acc = new();
-            List<Tuple<Bar, string, bool, string>> newBars = new();
+            List<Tuple<Bar, string, string>> newBars = new();
             foreach (var b in so.BarUpdateList)
             {
                 var ret = _barAggregatorMap[b.SymbolExchange].ProcessBar(b, so.CurrentUtcTime);

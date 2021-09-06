@@ -21,7 +21,7 @@ namespace CoreTypes
         public LMOD Orders=new();
         public TradingServiceState State;
         public List<(string mktExch,PriceProviderInfo ppi)> TicksInfo=new();
-        public List<Tuple<Bar, string, bool, string>> BarsInfo = new();
+        public List<Tuple<Bar, string, string>> BarsInfo = new();
         public LS TradesInfo=new();
         public LSSS Errors=new();
         public List<(string, int, double)> NewBpvMms=new();
@@ -32,7 +32,7 @@ namespace CoreTypes
             if (tickInfoList is { Count: > 0 })
                 TicksInfo.AddRange(tickInfoList);
         }
-        public void Accept(List<Tuple<Bar, string, bool,string>> barInfoList)
+        public void Accept(List<Tuple<Bar, string, string>> barInfoList)
         {
             if(barInfoList is {Count: > 0})
                 BarsInfo.AddRange(barInfoList);
@@ -72,7 +72,7 @@ namespace CoreTypes
         public LS TickInfoAsStrings(DateTime utcNow) =>
             TicksInfo.Select(ti => PriceProviderString(ti.ppi, utcNow, ti.mktExch)).ToList();
         public LS BarInfoAsStrings => BarsInfo.Select(t => 
-            BarInfoString(t.Item1, t.Item2, t.Item4)).ToList();
+            BarInfoString(t.Item1, t.Item2, t.Item3)).ToList();
 
         
     }

@@ -85,7 +85,7 @@ namespace CoreTypes
         /// </summary>
         /// <param name="utcNow">current time</param>
         /// <returns>aggregated bar or null</returns>
-        public Tuple<Bar, string, bool,string> ProcessTime(DateTime utcNow)
+        public Tuple<Bar, string, string> ProcessTime(DateTime utcNow)
         {
             if (Current == null) return null;
             if (_rule.IsBarCompleted(Current, utcNow, _gapInMinutes))
@@ -95,7 +95,7 @@ namespace CoreTypes
                 Current = null;
                 var flag = _newContract;
                 _newContract = false;
-                return new Tuple<Bar, string, bool, string>(completed, SymbolExchange, flag, ContractCode);
+                return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
             }
             return null;
         }
@@ -127,7 +127,7 @@ namespace CoreTypes
         /// <param name="bar">new five-sec bar</param>
         /// <param name="utcNow"></param>
         /// <returns>aggregated bar or null</returns>
-        public Tuple<Bar, string, bool, string> ProcessBar(Bar5s bar, DateTime utcNow)
+        public Tuple<Bar, string, string> ProcessBar(Bar5s bar, DateTime utcNow)
         {
             if (SymbolExchange != bar.SymbolExchange) return null;
             if (ContractCode != bar.ContractCode)
@@ -136,7 +136,7 @@ namespace CoreTypes
                 _newContract = true;
                 var completed = Current;
                 Current = new Bar(bar);
-                return completed == null ? null : new Tuple<Bar, string, bool,string>(completed, SymbolExchange, false, ContractCode);
+                return completed == null ? null : new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
             }
             if (Current == null)
             {
@@ -149,7 +149,7 @@ namespace CoreTypes
                     Current = null;
                     var flag = _newContract;
                     _newContract = false;
-                    return new Tuple<Bar, string, bool, string>(completed, SymbolExchange, flag, ContractCode);
+                    return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
                 }
                 return null;
             }
@@ -162,7 +162,7 @@ namespace CoreTypes
                 Current = null;
                 var flag = _newContract;
                 _newContract = false;
-                return new Tuple<Bar, string, bool, string>(completed, SymbolExchange, flag, ContractCode);
+                return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
             }
             return null;
         }

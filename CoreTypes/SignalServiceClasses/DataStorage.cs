@@ -112,14 +112,14 @@ namespace CoreTypes.SignalServiceClasses
                 instrument.UpdateSettings(currentTime, bpv, minMove);
         }
 
-        public void AddMinuteBars(List<Tuple<Bar, string,bool,string>> newBars)
+        public void AddMinuteBars(List<Tuple<Bar, string, string>> newBars)
         {
             if (DebugLog.IsWorking)
             {
                 DebugLog.AddMsg("AddMinuteBars " +
                                 string.Join("|", newBars.Select(t => string.Format("({0},{1},{2},{3},{4},{5},{6})",
                                     t.Item2,
-                                    t.Item4,
+                                    t.Item3,
                                     t.Item1.O,
                                     t.Item1.H,
                                     t.Item1.L,
@@ -128,7 +128,7 @@ namespace CoreTypes.SignalServiceClasses
                                 ))));
             }
 
-            foreach (Tuple<Bar, string, bool,string> tuple in newBars)
+            foreach (Tuple<Bar, string, string> tuple in newBars)
             {
                 if (!_instruments.TryGetValue(tuple.Item2.ToUpper(), out var instrument)) 
                 {
@@ -138,7 +138,7 @@ namespace CoreTypes.SignalServiceClasses
                     continue; 
 
                 }
-                instrument.AddMinuteBar(tuple.Item1, tuple.Item4);
+                instrument.AddMinuteBar(tuple.Item1, tuple.Item3);
             }
         }
 

@@ -20,7 +20,7 @@ namespace CoreTypes.SignalServiceClasses
         private int _curMinute = -1;
 
         public bool ProcessCurrentState(DateTime currentTime, List<(string, int, double)> newBpvMms,
-            List<Tuple<Bar, string, bool, string>> barValues)
+            List<Tuple<Bar, string, string>> barValues)
         {
             if (newBpvMms != null)
                 foreach (var mxBpvMM in newBpvMms)
