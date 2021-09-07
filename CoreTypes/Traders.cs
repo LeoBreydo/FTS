@@ -28,6 +28,7 @@ namespace CoreTypes
 
         public void ApplyCommand(ICommand command)
         {
+            if (command == null) return;
             var s = command.Source;
             if (s == CommandSource.User)
             {
@@ -41,6 +42,9 @@ namespace CoreTypes
                         break;
                 }
             }
+            else if(s == CommandSource.Scheduler)
+                _restrictionsManager.SetSchedulerRestriction(((RestrictionCommand) command).Restriction);
+
         }
 
         public void UpdateParentRestrictions(TradingRestriction parentRestriction)
@@ -90,6 +94,7 @@ namespace CoreTypes
         private TradingRestriction _currentRestriction;
         public void ApplyCommand(ICommand command)
         {
+            if (command == null) return;
             var s = command.Source;
             if (s == CommandSource.User)
             {
@@ -103,6 +108,8 @@ namespace CoreTypes
                         break;
                 }
             }
+            else if (s == CommandSource.Scheduler)
+                RestrictionsManager.SetSchedulerRestriction(((RestrictionCommand)command).Restriction);
         }
         public void UpdateParentRestrictions(TradingRestriction parentRestriction)
         {
@@ -268,9 +275,6 @@ namespace CoreTypes
                     {
                         case CommandSource.User:
                             _restrictionsManager.SetUserRestriction(r);
-                            break;
-                        case CommandSource.Scheduler:
-                            _restrictionsManager.SetSchedulerRestriction(r);
                             break;
                         case CommandSource.OutOfMarket:
                             _restrictionsManager.SetOutOfMarketRestriction(r);

@@ -26,10 +26,7 @@ namespace CoreTypes
             return en;
         }
 
-        public void RegisterExchangePosition(ExchangeTrader et)
-        {
-            ExchangePositions.Add(et.Position);
-        }
+        public void RegisterExchangePosition(ExchangeTrader et) => ExchangePositions.Add(et.Position);
     }
 
     public class ExchangePosition
@@ -41,10 +38,7 @@ namespace CoreTypes
         public decimal RealizedResult { get; private set; }
         public int DealNbr { get; private set; }
 
-        public ExchangePosition(ExchangeTrader owner)
-        {
-            Owner = owner;
-        }
+        public ExchangePosition(ExchangeTrader owner) => Owner = owner;
 
         public int Update(bool startNewDay)
         {
@@ -68,10 +62,7 @@ namespace CoreTypes
             return en;
         }
 
-        public void RegisterMarketPosition(MarketTrader mp)
-        {
-            MarketPositions.Add(mp.Position);
-        }
+        public void RegisterMarketPosition(MarketTrader mp) => MarketPositions.Add(mp.Position);
     }
 
     public class MarketPosition
@@ -133,15 +124,9 @@ namespace CoreTypes
             return _owner.ErrorTracker.TotalValue;
         }
 
-        public void RegisterStrategyPosition(StrategyTrader strategy)
-        {
-            StrategyPositions.Add(strategy.Position);
-        }
+        public void RegisterStrategyPosition(StrategyTrader strategy) => StrategyPositions.Add(strategy.Position);
 
-        public void StartNewSession()
-        {
-            _newSessionStarted = true;
-        }
+        public void StartNewSession() => _newSessionStarted = true;
     }
 
     public enum StrategyPositionStateEnum
@@ -155,8 +140,8 @@ namespace CoreTypes
     {
         public readonly int StrategyId;
         public readonly string StrategyName;
-        // exec, size, last settlement price (initial -1)
-        private readonly List<(Execution, int, decimal)> _openDeals = new();
+        // exec, size
+        private readonly List<(Execution, int)> _openDeals = new();
         private decimal _bpv;
         private bool _newSessionStarted;
 
@@ -198,20 +183,7 @@ namespace CoreTypes
 
         }
 
-        public void ProcessSettlementPrice(decimal settlementPrice)
-        {
-            for (var i = 0; i < _openDeals.Count; ++i)
-            {
-                var (e, size, p) = _openDeals[i];
-                RealizedResult += _bpv * (p == -1
-                    ? (settlementPrice - e.Price) * size
-                    : (settlementPrice - p) * size);
-                _openDeals[i] = (e, size, settlementPrice);
-            }
-
-            _refQuote = settlementPrice;
-            Owner.PositionValidator.ClearStopLossRestriction();
-        }
+        public void ClearStopLossRestrictions() => Owner.PositionValidator.ClearStopLossRestriction();
 
         public void ProcessNewDeals(IEnumerable<(Execution, int)> deals, InfoCollector ic)
         {
@@ -233,13 +205,13 @@ namespace CoreTypes
                 {
                     if (io == total)
                     {
-                        _openDeals.Add((e, cnt, -1));
+                        _openDeals.Add((e, cnt));
                         ++total;
                         cnt = 0;
                     }
                     else
                     {
-                        var (ee, ss, p) = _openDeals[io];
+                        var (ee, ss) = _openDeals[io];
                         if (ss == 0)
                         {
                             ++io;
@@ -251,39 +223,24 @@ namespace CoreTypes
                         {
                             // special case - signs of new deal size and open deal size are the same,
                             // -> to add new open deal to the end of _openDeals 
-                            _openDeals.Add((e, cnt, -1));
+                            _openDeals.Add((e, cnt));
                             ++total;
                             cnt = 0;
                         }
                         else
                         {
                             var (opDealRemainder, newDealRemainder) = t.Value;
-                            _openDeals[io] = (ee, opDealRemainder, p);
-                            switch (opDealRemainder)
+                            _openDeals[io] = (ee, opDealRemainder);
+                            if (opDealRemainder == 0)
                             {
-                                case 0 when newDealRemainder == 0:
-                                    // opened deal and new deal are reduced the both
-                                    trades.Add(TradeString(ee, e, ss, StrategyName));
-                                    RealizedResult += _bpv * (p == -1
-                                        ? (e.Price - ee.Price) * ss
-                                        : (e.Price - p) * ss);
-                                    ++io;
-                                    break;
-                                case 0:
-                                    // opened deal is reduced
-                                    trades.Add(TradeString(ee, e, ss, StrategyName));
-                                    RealizedResult += _bpv * (p == -1
-                                        ? (e.Price - ee.Price) * ss
-                                        : (e.Price - p) * ss);
-                                    ++io;
-                                    break;
-                                default:
-                                    // new deal is reduced
-                                    trades.Add(TradeString(ee, e, cnt, StrategyName));
-                                    RealizedResult += _bpv * (p == -1
-                                        ? (e.Price - ee.Price) * cnt
-                                        : (e.Price - p) * cnt);
-                                    break;
+                                trades.Add(TradeString(ee, e, ss, StrategyName));
+                                RealizedResult += _bpv * (e.Price - ee.Price) * ss;
+                                ++io;
+                            }
+                            else
+                            {
+                                trades.Add(TradeString(ee, e, cnt, StrategyName));
+                                RealizedResult += _bpv * (e.Price - ee.Price) * cnt;
                             }
                             cnt = newDealRemainder;
                         }
@@ -294,30 +251,21 @@ namespace CoreTypes
 
             Size = 0;
             _refQuote = 0;
-            var woq = 0m;
-            foreach (var (e, s, p) in _openDeals)
+            foreach (var (e, s) in _openDeals)
             {
                 Size += s;
-                _refQuote += (s * (p == -1 ? e.Price : p));
-                woq += s * e.Price;
+                _refQuote += s * e.Price;
             }
 
             _refQuote /= Size;
-            woq /= Size;
-            WeightedOpenQuote = (double) woq;
+            WeightedOpenQuote = (double) _refQuote;
 
             Owner.PositionValidator.UpdateGuards();
             if(trades.Count > 0) ic.Accept(trades);
         }
 
-        public void SetBigPointValue(int bpv)
-        {
-            _bpv = bpv;
-        }
+        public void SetBigPointValue(int bpv) => _bpv = bpv;
 
-        public void StartNewSession()
-        {
-            _newSessionStarted = true;
-        }
+        public void StartNewSession() => _newSessionStarted = true;
     }
 }

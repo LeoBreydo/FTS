@@ -4,7 +4,9 @@ using System.IO;
 using System.Linq;
 using System.Text.Json.Serialization;
 using System.Xml.Serialization;
+using Binosoft.TraderLib.Indicators;
 using Newtonsoft.Json.Converters;
+using TimeZoneConverter;
 
 namespace CoreTypes
 {
@@ -99,6 +101,27 @@ namespace CoreTypes
         }
     }
 
+    public class ScheduledIntervalDescription
+    {
+        public string EnterTimeZoneName { get; set; }
+        public string ExitTimeZoneName { get; set; }
+        public DateTime? SoftStopTime { get; set; }
+        public DateTime HardStopTime { get; set; }
+        public DateTime NoRestrictionTime { get; set; }
+
+        public ScheduledIntervalDescription()
+        {
+            EnterTimeZoneName = null;
+            ExitTimeZoneName = null;
+            SoftStopTime = null;
+            HardStopTime = DateTime.MinValue;
+            NoRestrictionTime = DateTime.MinValue;
+        }
+    }
+
+    public record ScheduledInterval(int TargetId, DateTime? SoftStopTime, DateTime HardStopTime,
+        DateTime NoRestrictionTime);
+
     public class TradingConfiguration
     {
         public int Id = -1;
@@ -107,6 +130,58 @@ namespace CoreTypes
         public GeneralSettings GeneralSettings { get; set; } = new();
         public List<ExchangeConfiguration> Exchanges { get; set; } = new();
         public int MaxErrorsPerDay = 0;
+
+        public int SchedulerTimeStepInMinutes = 5;
+        public List<ScheduledInterval> ScheduledIntervals { get; set; } = new();
+
+        public string AddScheduledInterval(ScheduledIntervalDescription sid, int id)
+        {
+            DateTime RoundedDateTime(DateTime dt, bool down)
+            {
+                var n = dt.Minute;
+                var q = n / SchedulerTimeStepInMinutes;
+                return down 
+                    ? dt.AddMinutes(SchedulerTimeStepInMinutes * q - n) 
+                    : dt.AddMinutes(SchedulerTimeStepInMinutes * (q + 1) - n);
+            }
+
+
+            if (SchedulerTimeStepInMinutes < 1 || SchedulerTimeStepInMinutes > 30)
+                return "SchedulerTimeStepInMinutes is not valid (must be integer and in [1;30] range)";
+            if (id < 0) return "id is not valid";
+            if (sid.HardStopTime == DateTime.MinValue) return "HardStopTime is not defined";
+            if (sid.NoRestrictionTime == DateTime.MinValue) return "NoRestrictionTime is not defined";
+            
+            // try to find TimeZones
+            if (string.IsNullOrEmpty(sid.EnterTimeZoneName)) return "Name of EnterTimeZone is undefined";
+            if (string.IsNullOrEmpty(sid.ExitTimeZoneName)) return "Name of ExitTimeZone is undefined";
+            var enterTzi = TZConvert.GetTimeZoneInfo(sid.EnterTimeZoneName);
+            if (enterTzi == null) return "EnterTimeZone info not found";
+            var exitTzi = TZConvert.GetTimeZoneInfo(sid.ExitTimeZoneName);
+            if (exitTzi == null) return "ExitTimeZone info not found";
+
+            // convert to utc and round to SchedulerTimeStepInMinutes
+            DateTime? utcSoftStopTime = null;
+            if (sid.SoftStopTime != null) 
+                utcSoftStopTime = RoundedDateTime( // round down
+                    TimeZoneInfo.ConvertTimeToUtc(
+                        DateTime.SpecifyKind(sid.SoftStopTime.Value, DateTimeKind.Unspecified), enterTzi), true);
+            var utcHardStopTime = RoundedDateTime( // round down
+                TimeZoneInfo.ConvertTimeToUtc(
+                    DateTime.SpecifyKind(sid.HardStopTime, DateTimeKind.Unspecified), enterTzi), true);
+            var utcNoRestrictionTime = RoundedDateTime( // round up
+                TimeZoneInfo.ConvertTimeToUtc(
+                    DateTime.SpecifyKind(sid.NoRestrictionTime, DateTimeKind.Unspecified), exitTzi), false);
+            
+            // verify invariants
+            if (utcSoftStopTime != null && utcSoftStopTime >= utcHardStopTime)
+                return "SoftStopTime must precede HardStopTime";
+            if (utcHardStopTime >= utcNoRestrictionTime)
+                return "HardStopTime must precede NoRestrictionTime";
+            
+            ScheduledIntervals.Add(new ScheduledInterval(id, utcSoftStopTime, utcHardStopTime, utcNoRestrictionTime));
+            return null;
+        }
 
         public string Verify()
         {
@@ -139,10 +214,8 @@ namespace CoreTypes
             try
             {
                 if (!File.Exists(fileName)) return null;
-                using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
-                {
-                    return (TradingConfiguration)serializer.Deserialize(fs);
-                }
+                using var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+                return (TradingConfiguration)serializer.Deserialize(fs);
             }
             catch
             {
