@@ -3,7 +3,7 @@ using System.Linq;
 
 namespace CoreTypes.SignalServiceClasses
 {
-    public class StrategyScheduleRestrictors
+    public class MarketToStrategyRestrictionMapper
     {
         #region nested classes
         class InstrumentStateHolder
@@ -71,7 +71,7 @@ namespace CoreTypes.SignalServiceClasses
         private bool _firstTime = true;
         private bool _anyStateChanged;
 
-        public StrategyScheduleRestrictors(List<(int, List<string>)> listOf_strategyWithUsedInstruments)
+        public MarketToStrategyRestrictionMapper(List<(int, List<string>)> listOf_strategyWithUsedInstruments)
         {
             _instrumentsMap = new Dictionary<string, InstrumentStateHolder>();
             _strategyRestrictors = new List<StrategyStateHolder>();
