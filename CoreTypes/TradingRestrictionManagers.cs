@@ -84,6 +84,9 @@ namespace CoreTypes
 
         public void SetErrorsNbrRestriction(TradingRestriction r) =>
             SetRestriction(r, CommandSource.ErrorsNbr);
+
+        public void SetSchedulerRestriction(TradingRestriction r) =>
+            SetRestriction(r, CommandSource.Scheduler);
     }
 
     public class MarketRestrictionsManager : TradingRestrictionManager
@@ -108,6 +111,9 @@ namespace CoreTypes
 
         public void SetOutOfMarketRestriction(TradingRestriction r) =>
             SetRestriction(r, CommandSource.OutOfMarket);
+
+        public void SetSchedulerRestriction(TradingRestriction r) =>
+            SetRestriction(r, CommandSource.Scheduler);
     }
 
     public class StrategyRestrictionsManager : TradingRestrictionManager
@@ -120,9 +126,6 @@ namespace CoreTypes
 
         public void SetCriticalLossRestriction(TradingRestriction r) =>
             SetRestriction(r, CommandSource.CriticalLoss);
-
-        public void SetSchedulerRestriction(TradingRestriction r) =>
-            SetRestriction(r, CommandSource.Scheduler);
 
         public void SetErrorRestriction(TradingRestriction r) =>
             SetRestriction(r, CommandSource.Error);
