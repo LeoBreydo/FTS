@@ -37,7 +37,7 @@ namespace CoreTypes
         private bool IsOutOfMarket()
         {
             if (_currentContract == null) return true;
-            return _owner.RestrictionsManager.GetRestriction(CommandSource.EndOfSession) == TradingRestriction.HardStop;
+            return _owner.RestrictionsManager.GetRestriction(CommandSource.OutOfMarket) == TradingRestriction.HardStop;
         }
 
         public void SetNewContractInfo(ContractInfo ci, InfoCollector ic, StateObject so)
@@ -112,10 +112,9 @@ namespace CoreTypes
                 {
                     case false when outOfSessionAfter:
                         {
-                            var settlementPrice = _owner.Position.PriceProvider.LastPrice;
-                            foreach (var s in _owner.StrategyMap.Values)
-                                s.Position.ProcessSettlementPrice(settlementPrice);
                             ic.Accept(_owner.MarketCode, _owner.Exchange);
+                            foreach (var s in _owner.StrategyMap.Values)
+                                s.Position.ClearStopLossRestrictions();
                             break;
                         }
                     case true when !outOfSessionAfter:

@@ -42,7 +42,7 @@ namespace Driver
             
             TService = new TradingService(Configuration, GetStrategiesFolder());
             Client = new ClientCommunicationFacade();
-            Scheduler = new Scheduler();
+            Scheduler = new Scheduler(Configuration);
             Logger = new(15, "Logs/"); //"./");
         }
 
@@ -152,7 +152,7 @@ namespace Driver
             if (so == null) return;
 
             var clientCmdList = Client.GetCommands();
-            var schedulerCmdList = Scheduler.GetCommands();
+            var schedulerCmdList = Scheduler.GetCommands(so.CurrentUtcTime);
             var icCommands = SignalService.GetCommands();
             var t = TService.ProcessCurrentState(so, clientCmdList, schedulerCmdList, icCommands);
             Facade.PlaceRequest(t.Subscriptions, t.Orders);
