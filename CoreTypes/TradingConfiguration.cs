@@ -133,6 +133,22 @@ namespace CoreTypes
 
             return null;
         }
+
+        public List<(StrategyConfiguration, List<string>)> GetAdditionalInstruments()
+        {
+            var ret = new List<(StrategyConfiguration, List<string>)>();
+            foreach(var xcfg in Exchanges)
+            foreach (var mcfg in xcfg.Markets)
+            foreach (var scfg in mcfg.Strategies)
+            {
+                var additionalInstrums = scfg.GetAdditionalInstruments(mcfg.MarketName);
+                if (additionalInstrums.Count > 0)
+                    ret.Add(new(scfg, additionalInstrums));
+            }
+
+            return ret;
+        }
+
         private static readonly XmlSerializer serializer = new XmlSerializer(typeof(TradingConfiguration));
         public static TradingConfiguration Restore(string fileName)
         {
@@ -479,6 +495,14 @@ namespace CoreTypes
         public int StoplossRestriction_MaxBarsToWaitForOppositeSignal = 1000;
         public bool StoplossRestriction_GoToFlatMustLiftRestriction = true;
 
+        public List<string> GetAdditionalInstruments(string mainInstrument)
+        {
+            return _strategyParameters
+                .GetInstrumentsFromStrategyParams()
+                .Where(instrum => !string.Equals(instrum, mainInstrument, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
         public string Verify(List<int> IDs, List<string> strategyNames)
         {
             if (Id < 0) return "Id must be non-negative";
@@ -503,7 +527,7 @@ namespace CoreTypes
             if (PreparationToStoppingBySchedulerInterval < 0)
                 return "PreparationToStoppingBySchedulerInterval must be non-negative";
 
-            // strategy patameters verification to be done!!
+            // strategy parameters verification to be done!!
 
             if (GapTimeoutInSeconds <= 0) return "GapTimeoutInSeconds must be non-negative";
             if (SynchronizationMinute < 0 || SynchronizationMinute > 1439)
