@@ -10,9 +10,12 @@ namespace CoreTypes
         private readonly SortedList<int, CommandDestination> _cdMap = new();
         private readonly int _schedulerTimeStepInMinutes;
         private bool _firstCall = true;
+        private readonly bool _isEmpty;
         public Scheduler(TradingConfiguration config)
         {
-            List<ScheduledInterval> scheduledIntervals = config.ScheduledIntervals;
+            var scheduledIntervals = config.ScheduledIntervals;
+            if (scheduledIntervals == null || scheduledIntervals.Count == 0) return;
+
             _cdMap.Add(config.Id,CommandDestination.Service);
             foreach (var lex in config.Exchanges)
             {
@@ -20,52 +23,67 @@ namespace CoreTypes
                 foreach(var mt in lex.Markets)
                     _cdMap.Add(mt.Id,CommandDestination.Market);
             }
-            if (scheduledIntervals == null || scheduledIntervals.Count == 0) return;
+            
             _schedulerTimeStepInMinutes = config.SchedulerTimeStepInMinutes;
             var groups = scheduledIntervals.GroupBy(si => si.TargetId);
+
             foreach (var g in groups)
             {
                 var id = g.Key;
-                var intervalList = g.ToList();
-                var temp0 = Enumerable.Repeat(TradingRestriction.NoRestrictions, intervalList.Count).ToArray();
+                if (!_cdMap.ContainsKey(id)) continue;
 
-                List<(int, DateTime, TradingRestriction)> temp1 = new ();
-                var idx = 0;
-                foreach (var si in intervalList)
+                var temp0 = FirstStep(g, out var temp1);
+                var temp2 = SecondStep(temp1, temp0);
+                foreach (var (dt, tr) in temp2)
                 {
-                    if(si.SoftStopTime != null) temp1.Add((idx,si.SoftStopTime.Value,TradingRestriction.SoftStop));
-                    temp1.Add((idx,si.HardStopTime,TradingRestriction.HardStop));
-                    temp1.Add((idx,si.NoRestrictionTime,TradingRestriction.NoRestrictions));
-                    ++idx;
-                }
-                temp1 = temp1.OrderBy(t => t.Item2).ToList();
-
-                List<(DateTime, TradingRestriction)> temp2 = new();
-                var dt = DateTime.MinValue;
-                foreach (var t in temp1)
-                {
-                    if (t.Item2 > dt)
-                    {
-                        var r = temp0.Max();
-                        temp2.Add((dt,r));
-                        dt = t.Item2;
-                    }
-                    temp0[t.Item1] = t.Item3;
-                }
-                temp2.Add((dt,temp0.Max()));
-                temp2.RemoveAt(0);
-
-                foreach (var t in temp2)
-                {
-                    if(!_timeLine.ContainsKey(t.Item1)) _timeLine.Add(t.Item1, new List<(int id, TradingRestriction tr)>());
-                    _timeLine[t.Item1].Add((id,t.Item2));
+                    if(!_timeLine.ContainsKey(dt)) _timeLine.Add(dt, new List<(int, TradingRestriction)>());
+                    _timeLine[dt].Add((id,tr));
                 }
             }
+
+            _isEmpty = _timeLine.Count == 0;
         }
 
+        private static TradingRestriction[] FirstStep(IEnumerable<ScheduledInterval> g, out List<(int, DateTime, TradingRestriction)> temp1)
+        {
+            var intervalList = g.ToList();
+            var temp0 = Enumerable.Repeat(TradingRestriction.NoRestrictions, intervalList.Count).ToArray();
+            temp1 = new();
+            var idx = 0;
+            foreach (var si in intervalList)
+            {
+                if (si.SoftStopTime != null) temp1.Add((idx, si.SoftStopTime.Value, TradingRestriction.SoftStop));
+                temp1.Add((idx, si.HardStopTime, TradingRestriction.HardStop));
+                temp1.Add((idx, si.NoRestrictionTime, TradingRestriction.NoRestrictions));
+                ++idx;
+            }
+            temp1 = temp1.OrderBy(t => t.Item2).ToList();
+            return temp0;
+        }
+        private static List<(DateTime, TradingRestriction)> SecondStep(List<(int, DateTime, TradingRestriction)> temp1, IList<TradingRestriction> temp0)
+        {
+            List<(DateTime, TradingRestriction)> temp2 = new();
+            var dt = DateTime.MinValue;
+            foreach (var (idx, dateTime, tradingRestriction) in temp1)
+            {
+                if (dateTime > dt)
+                {
+                    var r = temp0.Max();
+                    temp2.Add((dt, r));
+                    dt = dateTime;
+                }
+                temp0[idx] = tradingRestriction;
+            }
+            temp2.Add((dt, temp0.Max()));
+            temp2.RemoveAt(0);
+            return temp2;
+        }
+
+        
         private DateTime _lastUsedDateTime = DateTime.MinValue;
         public List<ICommand> GetCommands(DateTime utcNow)
         {
+            if (_isEmpty) return new();
             List<(int id, TradingRestriction tr)> lst = null;
             if (_firstCall)
             {
