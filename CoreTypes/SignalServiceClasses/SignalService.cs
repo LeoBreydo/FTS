@@ -20,7 +20,7 @@ namespace CoreTypes
         public SignalService(TradingConfiguration cfg, string strategiesFolder)
         {
             string error = Init(cfg, strategiesFolder);
-            if (error != null) throw new Exception(error);// todo!!! modify behavior, save to log instead of exception!!!
+            if (error != null) throw new Exception(error);
         }
         #region Init
         private string Init(TradingConfiguration cfg, string strategiesFolder)
