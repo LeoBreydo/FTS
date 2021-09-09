@@ -29,7 +29,22 @@ namespace Driver
         
 
         private bool _stoppedByHost = false;
-        
+
+        public static bool Create(IBCredentials credentials, out MainObject mainObject,out string error)
+        {
+            try
+            {
+                mainObject = new MainObject(credentials);
+                error = null;
+                return true;
+            }
+            catch(Exception exception)
+            {
+                mainObject = null;
+                error= exception.ToString();
+                return false;
+            }
+        }
         public MainObject(IBCredentials credentials)
         {
             Facade = new IBBrokerFacade(credentials);

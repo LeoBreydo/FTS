@@ -1,12 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Threading;
-using System.Threading.Tasks;
-using Binosoft.TraderLib.Indicators;
 using BrokerFacadeIB;
-using CoreTypes;
-using CoreTypes.SignalServiceClasses;
 
 namespace Driver
 {
@@ -14,8 +8,14 @@ namespace Driver
     {
         static void Main(string[] args)
         {
-            var cred = ReadIBCredentials();
-            var mo = new MainObject(cred);
+            if (!MainObject.Create(ReadIBCredentials(), out MainObject mo, out string error))
+            {
+                Console.WriteLine("Failed to initialize trading service: " + error);
+                Console.WriteLine("To exit hit any key");
+                Console.ReadKey();
+                return;
+            }
+
             mo.StartWork();
             Console.ReadKey();
             mo.StopWork();

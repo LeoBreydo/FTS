@@ -1,4 +1,5 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace CoreTypes.SignalServiceClasses
@@ -73,6 +74,9 @@ namespace CoreTypes.SignalServiceClasses
 
         public MarketToStrategyRestrictionMapper(List<(int, List<string>)> listOf_strategyWithUsedInstruments)
         {
+            if (listOf_strategyWithUsedInstruments.Count > 0)
+                throw new Exception("Usage of additional instruments is disabled"); // please re-activate methods GetCommands() when will remove this restriction
+
             _instrumentsMap = new Dictionary<string, InstrumentStateHolder>();
             _strategyRestrictors = new List<StrategyStateHolder>();
             foreach (var strategyId_usedMarkets in listOf_strategyWithUsedInstruments)
@@ -101,6 +105,7 @@ namespace CoreTypes.SignalServiceClasses
 
         public List<ICommand> GetCommands()
         {
+            return null; 
             if (_firstTime)
             {
                 _firstTime = false;

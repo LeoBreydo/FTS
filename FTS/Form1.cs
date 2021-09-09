@@ -34,7 +34,12 @@ namespace FTS
                 credentials = newCred;
             }
 
-            _mainObject ??= new MainObject(credentials);
+            if (_mainObject == null && !MainObject.Create(credentials, out _mainObject, out string error))
+            {
+                // invalid trading config or whatever
+                MessageBox.Show(this, "Failed to initialize trading service: " + error, "Rejection");
+                return;
+            }
             _mainObject.StartWork();
             EnableButtons();
         }
@@ -42,7 +47,7 @@ namespace FTS
         {
             var newCred = CredentialsForm.Call(credentials, fname_IbCredentials, this);
             if (newCred != null)
-            credentials = newCred;
+                credentials = newCred;
         }
 
         private void btnStop_Click(object sender, EventArgs e)
