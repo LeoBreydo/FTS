@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace CoreTypes
 {
@@ -29,6 +30,13 @@ namespace CoreTypes
         public List<OrderStateMessage> OrderStateMessageList { get; }
         public List<Tuple<string,string>> TextMessageList { get; }
 
+        public List<string> HistoricalBarsForLog()
+        {
+            if (HistoricalData == null || HistoricalData.Count == 0) return null;
+            return HistoricalData.SelectMany(t =>
+                    t.historicalBars.Select(b =>
+                        MessageStringProducer.HistoricalBarInfoString(b, t.mktExch, t.contrCode)))
+                .ToList();
+        }
     }
-
 }

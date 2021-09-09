@@ -7,7 +7,7 @@ namespace CoreTypes
         /// <summary>
         /// Open (first bar quotation)
         /// </summary>
-        public double O { get; private set; }
+        public double O { get; }
         /// <summary>
         /// High (the highest bar quotation)
         /// </summary>
@@ -56,11 +56,6 @@ namespace CoreTypes
         {
             Processed = whenProcessed;
         }
-
-        //public static Bar operator +(Bar current, Bar5s next)
-        //    => new(current.O, Math.Max(current.H, next.High), Math.Min(current.L, next.Low),
-        //        next.Close, current.Start, next.BarOpenTime.AddSeconds(5));
-
     }
     public class BarAggregator
     {
@@ -121,17 +116,17 @@ namespace CoreTypes
             }
 
             if (Current == null)
-                Current = BarFromTick(time, value);
+                Current = StartNewBar(time, value);
             else if (time >= Current.End)
             {
                 ic.AcceptMinuteBar(SymbolExchange, ContractCode, Current);
-                Current = BarFromTick(time, value);
+                Current = StartNewBar(time, value);
             }
             else
                 Current.Append(value);
         }
 
-        private static Bar BarFromTick(DateTime time, double value)
+        private static Bar StartNewBar(DateTime time, double value)
         {
             var begin = new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute, 0, time.Kind);
             return new Bar(value, value, value, value, begin, begin.AddMinutes(1));

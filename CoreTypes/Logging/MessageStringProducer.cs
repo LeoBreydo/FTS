@@ -20,6 +20,9 @@ namespace CoreTypes
         public static string BarInfoString(Bar b, string symbolExchange, string contractCode) =>
             $"{symbolExchange},{b.O},{b.H},{b.L},{b.C},{b.Start:yyyyMMdd:HHmmss},{b.End:yyyyMMdd:HHmmss},{contractCode}";
 
+        public static string HistoricalBarInfoString(Bar b, string symbolExchange, string contractCode) =>
+            $"H {symbolExchange},{b.O},{b.H},{b.L},{b.C},{b.Start:yyyyMMdd:HHmmss},{b.End:yyyyMMdd:HHmmss},{contractCode}";
+
         public static string BarInfoStringFormat => 
             "# SymbolExchange,Open,High,Low,Close," +
             "StartOfBar:yyyyMMdd:HHmmss,EndOfBar:yyyyMMdd:HHmmss,ContractCode";
