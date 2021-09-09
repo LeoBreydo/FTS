@@ -48,16 +48,9 @@ namespace CoreTypes
 
         private static List<(int, List<string>)> GetStrategyWithUsedInstruments(TradingConfiguration cfg)
         {
-            return cfg.Exchanges.SelectMany(x => x.Markets)
-                .SelectMany(mkt => mkt.Strategies.Select(s => (s.Id, GetMarketsUsedByStrategy(mkt, s))))
-                .ToList();
+            return cfg.GetAdditionalInstruments().Select(t => (t.Item1.Id, t.Item2)).ToList();
         }
         // ReSharper disable once UnusedParameter.Local
-        private static List<string> GetMarketsUsedByStrategy(MarketConfiguration mkt, StrategyConfiguration str)
-        {
-            // in cur version we suppose that strategy uses the only main market (no additional instruments)
-            return new() {mkt.MCX()};
-        }
         #endregion
         public void ProcessCurrentState(DateTime currentTime, List<(string, int, double)> newBpvMms, 
             List<Tuple<Bar, string, string>> barValues,
