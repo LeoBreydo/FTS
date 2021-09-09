@@ -7,19 +7,19 @@ namespace CoreTypes
         /// <summary>
         /// Open (first bar quotation)
         /// </summary>
-        public double O { get; }
+        public double O { get; private set; }
         /// <summary>
         /// High (the highest bar quotation)
         /// </summary>
-        public double H { get; }
+        public double H { get; private set; }
         /// <summary>
         /// Low )the lowest bar quotation)
         /// </summary>
-        public double L { get; }
+        public double L { get; private set; }
         /// <summary>
         /// Close (last bar quotation)
         /// </summary>
-        public double C { get; }
+        public double C { get; private set; }
 
         /// <summary>
         /// Time of start the first one-minute bar used for building this bar
@@ -46,18 +46,21 @@ namespace CoreTypes
             Processed = end;
         }
 
-        public Bar(Bar5s bar) :
-            this(bar.Open, bar.High, bar.Low, bar.Close, bar.BarOpenTime, bar.BarOpenTime.AddSeconds(5))
-        { }
-
+        public void Append(double newPrice)
+        {
+            if (H < newPrice) H = newPrice;
+            if (L > newPrice) L = newPrice;
+            C = newPrice;
+        }
         public void SetProcessedTime(DateTime whenProcessed)
         {
             Processed = whenProcessed;
         }
 
-        public static Bar operator +(Bar current, Bar5s next)
-            => new(current.O, Math.Max(current.H, next.High), Math.Min(current.L, next.Low),
-                next.Close, current.Start, next.BarOpenTime.AddSeconds(5));
+        //public static Bar operator +(Bar current, Bar5s next)
+        //    => new(current.O, Math.Max(current.H, next.High), Math.Min(current.L, next.Low),
+        //        next.Close, current.Start, next.BarOpenTime.AddSeconds(5));
+
     }
     public class BarAggregator
     {
@@ -82,18 +85,15 @@ namespace CoreTypes
         /// + SymbolExchange + isNewContract
         /// </summary>
         /// <param name="utcNow">current time</param>
+        /// <param name="ic">collector of completed minute bars</param>
         /// <returns>aggregated bar or null</returns>
-        public Tuple<Bar, string, string> ProcessTime(DateTime utcNow)
+        public void ProcessTime(DateTime utcNow, InfoCollector ic)
         {
-            if (Current == null) return null;
-            if (_rule.IsBarCompleted(Current, utcNow, _gapInMinutes))
+            if (Current != null && _rule.IsBarCompleted(Current, utcNow, _gapInMinutes))
             {
-                var completed = Current;
-                completed.SetProcessedTime(utcNow);
+                ic.AcceptMinuteBar(SymbolExchange, ContractCode, Current);
                 Current = null;
-                return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
             }
-            return null;
         }
 
         /// <summary>
@@ -112,47 +112,29 @@ namespace CoreTypes
             return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
         }
 
-        /// <summary>
-        /// returns aggregated bar if it will be finished by aggregating rules
-        /// + SymbolExchange + isNewContract
-        /// </summary>
-        /// <param name="bar">new five-sec bar</param>
-        /// <param name="utcNow"></param>
-        /// <returns>aggregated bar or null</returns>
-        public Tuple<Bar, string, string> ProcessBar(Bar5s bar, DateTime utcNow)
+        public void ProcessTick(DateTime time, string contractCode, double value, InfoCollector ic)
         {
-            if (SymbolExchange != bar.SymbolExchange) return null;
-            if (ContractCode != bar.ContractCode)
+            if (ContractCode != contractCode)
             {
-                var prevCC = ContractCode;
-                ContractCode = bar.ContractCode;
-                var completed = Current;
-                Current = new Bar(bar);
-                return completed == null ? null : new Tuple<Bar, string, string>(completed, SymbolExchange, prevCC);
-            }
-            if (Current == null)
-            {
-                Current = new Bar(bar);
-                
-                if (_rule.IsBarCompleted(Current))
-                {
-                    var completed = Current;
-                    completed.SetProcessedTime(utcNow);
-                    Current = null;
-                    return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
-                }
-                return null;
+                Current = null;
+                ContractCode = contractCode;
             }
 
-            Current += bar;
-            if (_rule.IsBarCompleted(Current))
+            if (Current == null)
+                Current = BarFromTick(time, value);
+            else if (time >= Current.End)
             {
-                var completed = Current;
-                completed.SetProcessedTime(utcNow);
-                Current = null;
-                return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
+                ic.AcceptMinuteBar(SymbolExchange, ContractCode, Current);
+                Current = BarFromTick(time, value);
             }
-            return null;
+            else
+                Current.Append(value);
+        }
+
+        private static Bar BarFromTick(DateTime time, double value)
+        {
+            var begin = new DateTime(time.Year, time.Month, time.Day, time.Hour, time.Minute, 0, time.Kind);
+            return new Bar(value, value, value, value, begin, begin.AddMinutes(1));
         }
     }
     public class XSecondsAggregationRules
@@ -182,8 +164,6 @@ namespace CoreTypes
     {
         public bool IsBarCompleted(Bar currentBar, DateTime currentTime, int gapInMinutes) =>
             currentBar.Start.Minute != currentTime.Minute || (currentTime - currentBar.Start).TotalSeconds >= 60;
-
-        public bool IsBarCompleted(Bar currentBar)=> currentBar.End.Second == 0;
     }
 
 }
