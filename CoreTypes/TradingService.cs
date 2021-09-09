@@ -164,8 +164,6 @@ namespace CoreTypes
             var ic = new InfoCollector();
 
             ApplyNewTicks(so,ic);
-            MakeNewOneMinuteBars(so, ic);
-
 
             ProcessContractInfos(so, ic);
             ApplyOrderReports(so, ic);
