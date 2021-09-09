@@ -22,8 +22,7 @@ namespace CoreTypes.SignalServiceClasses
     {
         private const int MaxIgnoredGapSizeInSeconds = 60;
         private const int WaitHistoryTimeoutInSeconds = 60;
-        private readonly Dictionary<string, InstrumentData> _instruments;  // key is instrument name in lower case
-
+        private readonly Dictionary<string, InstrumentData> _instruments;  // todo should be optimized: casting of the instrument name to upper case should be in the BrokerFacade only but not here
 
         public DataStorageState State { get; private set; }
         private DateTime _stateStartedTime;

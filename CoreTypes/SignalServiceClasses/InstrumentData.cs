@@ -13,7 +13,8 @@ namespace CoreTypes.SignalServiceClasses
 
         private string _currentContract = string.Empty;
         private DateTime _lastBarCloseTime;
-        public bool WorkingMode;
+        public bool WorkingMode;  // meaning: true='load of history is done, process incoming minute bars in normal working way'; false='new completed bars placed to temp buffer, wait for historical data'
+        private readonly List<Bar> _tempBuffer=new List<Bar>();
 
         public readonly TimeFrameData MinTimeFrame;
         public readonly List<ScaledTimeGridTimeFrame> ScaledTimeframes;
@@ -69,6 +70,7 @@ namespace CoreTypes.SignalServiceClasses
             MinTimeFrame.Reset();
             foreach (var scaledTf in ScaledTimeframes)
                 scaledTf.Reset();
+            _tempBuffer.Clear();
             _lastBarCloseTime = DateTime.MinValue;
         }
 
@@ -80,7 +82,15 @@ namespace CoreTypes.SignalServiceClasses
                 StartNewContract();
             }
 
-            if (bar.End <= _lastBarCloseTime) return; // ignore obsolete data 
+            if (WorkingMode)
+                AddMinuteBarImpl(bar);
+            else
+                _tempBuffer.Add(bar);
+        }
+
+        private void AddMinuteBarImpl(Bar bar)
+        {
+            if (bar.End <= _lastBarCloseTime) return; // bars must be strictly growing
             _lastBarCloseTime = bar.End;
 
             MinTimeFrame.Push(bar.End, new[] { bar.O, bar.H, bar.L, bar.C });
@@ -90,14 +100,25 @@ namespace CoreTypes.SignalServiceClasses
 
         public void AddHistoricalBars(string contractCode,List<Bar> historicalBars)
         {
-//#error not implemented
+            if (_currentContract != contractCode)
+            {
+                _currentContract = contractCode;
+                StartNewContract();
+            }
+
+            foreach (Bar bar in historicalBars)
+                AddMinuteBarImpl(bar);
+            foreach (Bar bar in _tempBuffer)
+                AddMinuteBarImpl(bar);
+            _tempBuffer.Clear();
+
+            WorkingMode = true;
         }
 
         public void ProcessTime(DateTime reachedTime)
         {
             foreach (var scaledTf in ScaledTimeframes)
                 scaledTf.ProcessTime(reachedTime);
-
         }
 
     }
