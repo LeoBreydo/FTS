@@ -104,6 +104,7 @@ namespace CoreTypes
                         break;
                     case false when outOfMarketAfter:
                         // market is just closed
+                        _currentContract = null; // to start requests for updating contract info
                         ic.Accept(_owner.MarketCode + _owner.Exchange, 1); // set restriction
                         break;
                 }
@@ -112,7 +113,8 @@ namespace CoreTypes
                 {
                     case false when outOfSessionAfter:
                         {
-                            ic.Accept(_owner.MarketCode, _owner.Exchange);
+                            // moved to outOfMarketBefore block
+                            //ic.Accept(_owner.MarketCode, _owner.Exchange);
                             foreach (var s in _owner.StrategyMap.Values)
                                 s.Position.ClearStopLossRestrictions();
                             break;
