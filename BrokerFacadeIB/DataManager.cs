@@ -172,10 +172,25 @@ namespace BrokerFacadeIB
 
 
         // we should call this method at start of new day in timezone of the contracts of interest.
+        private readonly List<(string, string)> _waitingReqContractDetails = new ();
+        private const int MAX_REQUESTS_PER_SECOND = 50;
         public void PlaceRequest(List<(string,string)> contractCodesAndExchanges)
         {
-            foreach (var (contractCode, exchange) in contractCodesAndExchanges)
+            // NB _waitingReqContractDetails is used from main thread only, so thread safety is not needed here
+            foreach (var item in contractCodesAndExchanges)
+                if (!_waitingReqContractDetails.Contains(item))
+                    _waitingReqContractDetails.Add(item);
+
+            if (_waitingReqContractDetails.Count==0 || !_client.ConnectionEstablished) return;
+
+            int limit = Math.Min(_waitingReqContractDetails.Count, MAX_REQUESTS_PER_SECOND);
+            int i;
+            for (i = 0; i < limit && _client.ConnectionEstablished; ++i)
+            {
+                var (contractCode, exchange) = _waitingReqContractDetails[i];
                 RequestContractDetails(contractCode, exchange);
+            }
+            _waitingReqContractDetails.RemoveRange(0, i);
         }
 
         public bool GetMarketCode(int id, out string marketCode)
