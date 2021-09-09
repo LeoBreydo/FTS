@@ -58,15 +58,17 @@ namespace CoreTypes
             // in cur version we suppose that strategy uses the only main market (no additional instruments)
             return new() {mkt.MCX()};
         }
+
+        private bool _isConnectionEstablished;
         #endregion
-        public void ProcessCurrentState(DateTime currentTime, List<(string, int, double)> newBpvMms, 
-            List<Tuple<Bar, string, string>> barValues,
-            List<(string mktExch, PriceProviderInfo ppi)> tickInfos)
+        public void ProcessCurrentState(StateObject so, InfoCollector ic)
         {
-            foreach (var tickInfo in tickInfos)
+            _isConnectionEstablished = so.IsConnectionEstablished;
+
+            foreach ((string mktExch, PriceProviderInfo ppi) tickInfo in ic.TicksInfo)
                 SetLastPrice(tickInfo.mktExch, tickInfo.ppi.Last);
 
-            if (_indicatorsFacade.ProcessCurrentState(currentTime,newBpvMms, barValues))
+            if (_indicatorsFacade.ProcessCurrentState(so,ic))
             {
                 foreach (StrategyInfoHolder strategy in _strategies.Values)
                     strategy.UpdateDecision();
@@ -78,8 +80,12 @@ namespace CoreTypes
             var ret= _strategies.TryGetValue(strategyID, out var strategy)
                 ? strategy.GetResetLastDecision()
                 : Signal.TO_FLAT;
+
+            if (!_isConnectionEstablished) return Signal.NO_SIGNAL;
+
             if (ret != Signal.NO_SIGNAL)
                 DebugLog.AddMsg(string.Format("Strategy {0} returns new signal {1}", strategyID, ret));
+
             return ret;
         }
 

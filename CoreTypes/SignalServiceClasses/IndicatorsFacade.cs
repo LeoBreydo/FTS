@@ -11,38 +11,54 @@ namespace CoreTypes.SignalServiceClasses
         private readonly DataStorage _dataStorage;
         private readonly CommonIndicatorsContainer _indicatorsContainer;
 
+
+        private int _curMinute = -1;
+
         public IndicatorsFacade(TradingConfiguration cfg)
         {
             _dataStorage = new DataStorage(cfg);
             _indicatorsContainer = new CommonIndicatorsContainer(_dataStorage);
-
         }
-        private int _curMinute = -1;
 
-        public bool ProcessCurrentState(DateTime currentTime, List<(string, int, double)> newBpvMms,
-            List<Tuple<Bar, string, string>> barValues)
+        public bool ProcessCurrentState(StateObject so, InfoCollector ic)
         {
-            if (newBpvMms != null)
+            DateTime currentTime = GetBeginOfSecond(so.CurrentUtcTime);
+
+            List<(string instrum, int bpv, double mm)> newBpvMms = ic.NewBpvMms;
+            if (newBpvMms.Count>0)
                 foreach (var mxBpvMM in newBpvMms)
                     _dataStorage.UpdateSettings(currentTime, mxBpvMM.Item1, mxBpvMM.Item2, mxBpvMM.Item3);
 
-            if (barValues?.Count > 0)
-                _dataStorage.AddMinuteBars(barValues);
+            List<(string mktExch, string contrCode, List<Bar> historicalBars)> historicalBars = so.HistoricalData;
+            if (historicalBars.Count>0)
+                _dataStorage.AddHistoricalBars(historicalBars);
 
+            var barValues = ic.BarsInfo;
+            if (ic.BarsInfo.Count > 0)
+                _dataStorage.AddMinuteBars(ic.BarsInfo);
+
+
+            _dataStorage.ProcessTime(currentTime, so.IsConnectionEstablished);
+
+            // in current version we update indicator values at end of minute when in working state
             bool endOfMinute = false;
-            if (currentTime.Minute == _curMinute)
+            if (currentTime.Minute != _curMinute)
             {
                 _curMinute = currentTime.Minute;
-                _dataStorage.ProcessTime(currentTime);
                 endOfMinute = true;
             }
 
-            if (newBpvMms?.Count > 0 || barValues?.Count > 0 || endOfMinute)
+
+            if (endOfMinute && _dataStorage.State== DataStorageState.Working)
             {
                 _indicatorsContainer.RefreshIndicators(currentTime);
                 return true;
             }
             return false;
+        }
+        private static DateTime GetBeginOfSecond(DateTime t)
+        {
+            return new DateTime(t.Year, t.Month, t.Day, t.Hour, t.Minute, t.Second, t.Kind);
         }
 
 

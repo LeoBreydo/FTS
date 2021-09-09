@@ -22,14 +22,14 @@ namespace BrokerFacadeIB
 
         private readonly ConcurrentDictionary<int, (string symbolExchange, string contractCode)> _registry = new();
         private readonly ConcurrentDictionary<int, (string symbolExchange, string contractCode)> _5sBars = new();
-        private readonly ConcurrentDictionary<int, (string symbolExchange, string contractCode)> _regHistoryRequests = new();
+        private readonly ConcurrentDictionary<int, (string symbolExchange, string contractCode, List<Bar> history)> _regHistoryRequests = new();
         private readonly ConcurrentDictionary<string, Contract> _symbolAndExchangeToContract;
 
         private readonly BlockingCollection<TickInfo> _quoteQueue = new();
         private readonly BlockingCollection<ContractDetails> _contractQueue = new();
         private readonly BlockingCollection<Bar5s> _barsQueue = new();
         private readonly BlockingCollection<Tuple<string, string>> _textMessageQueue;
-        private readonly BlockingCollection<(string mktExch, Bar histbar, string contrCode)> _historicalBars=new ();
+        private readonly BlockingCollection<(string mktExch, string contrCode,List<Bar> history)> _loadedHistory=new ();
         
 
         private void AddMessage(string tag, string message)
@@ -120,7 +120,7 @@ namespace BrokerFacadeIB
         }
 
 #endif
-        public (List<TickInfo>, List<ContractInfo>, List<Bar5s>,List<(string mktExch,Bar histbar,string contrCode)>) 
+        public (List<TickInfo>, List<ContractInfo>, List<Bar5s>, List<(string mktExch, string contrCode, List<Bar> historicalBars)>) 
             GetState(DateTime currentUtc)
         {
 #if WORKWITH_DELAYED_DATA
@@ -167,7 +167,7 @@ namespace BrokerFacadeIB
                 }
             }
 
-            return (qtList, ciList, barsList, _historicalBars.GetConsumingEnumerable().ToList());
+            return (qtList, ciList, barsList, _loadedHistory.GetConsumingEnumerable().ToList());
         }
 
 
@@ -319,17 +319,15 @@ namespace BrokerFacadeIB
         }
         private void _client_HistoricalData(int reqId, IBApi.Bar bar)
         {
-            if (!_regHistoryRequests.TryGetValue(reqId, out var t)) return;
-            var (symbolExchange, contractCode) = t;
-
+            if (!_regHistoryRequests.TryGetValue(reqId, out var symbolExchange_contractcode_bars)) return;
 
             if (bar == null) // end of history
             {
-                _historicalBars.Add(new(symbolExchange, null, contractCode));
-                _regHistoryRequests.Remove(reqId, out _); 
+                _regHistoryRequests.Remove(reqId, out _);
+                _loadedHistory.Add(symbolExchange_contractcode_bars);
             }
             else
-                _historicalBars.Add(new(symbolExchange, ConvertMinuteBar(bar), contractCode));
+                symbolExchange_contractcode_bars.history.Add(ConvertMinuteBar(bar));
         }
         private static Bar ConvertMinuteBar(IBApi.Bar bar)
         {
@@ -388,7 +386,7 @@ namespace BrokerFacadeIB
             }
 
             var tickerId = GetNextTickerId();
-            _regHistoryRequests[tickerId] = (symbolExchange, contract.LocalSymbol);
+            _regHistoryRequests[tickerId] = (symbolExchange, contract.LocalSymbol,new List<Bar>());
             var end = GetBeginOfMinute(DateTime.UtcNow).ToString("yyyyMMdd HH:mm:ss"); // nearest border of the requested data converted to used format 
             _client.ClientSocket.reqHistoricalData(tickerId, contract, end,
                 "1 W", "1 min", "TRADES", 1, 1, false, null);
@@ -413,9 +411,9 @@ namespace BrokerFacadeIB
                 AddMessage("ERROR",
                     $"Subscription to 5Sec_Bars {symbolExchange_contractcode.symbolExchange} contract {symbolExchange_contractcode} failed, ErrorCode={errorCode}, Msg={str}");
             }
-            else if (_regHistoryRequests.Remove(tickerId, out symbolExchange_contractcode))
+            else if (_regHistoryRequests.Remove(tickerId, out var symbolExchange_contractcode_bars))
             {
-                _historicalBars.Add(new(symbolExchange_contractcode.symbolExchange, null, symbolExchange_contractcode.contractCode));
+                _loadedHistory.Add(symbolExchange_contractcode_bars);
 
                 AddMessage("ERROR",
                     $"Failed to load historical market data for {symbolExchange_contractcode.symbolExchange}, Contract={symbolExchange_contractcode.contractCode}. Msg={str}");

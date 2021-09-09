@@ -170,8 +170,8 @@ namespace CoreTypes
 
             ProcessContractInfos(so, ic);
             ApplyOrderReports(so, ic);
-            
-            SignalService.ProcessCurrentState(so.CurrentUtcTime, ic.NewBpvMms, ic.BarsInfo, ic.TicksInfo);
+
+            SignalService.ProcessCurrentState(so, ic);
 
             UpdateProfitLossInfos(so);
             UpdateParentRestrictions();

@@ -11,11 +11,18 @@ namespace CoreTypes.SignalServiceClasses
         private double _minMove;
         private int _bpv;
 
+        private string _currentContract = string.Empty;
+        private DateTime _lastBarCloseTime;
+        public bool WorkingMode;
+
         public readonly TimeFrameData MinTimeFrame;
         public readonly List<ScaledTimeGridTimeFrame> ScaledTimeframes;
         public readonly TimeFrameData MinmoveHolder, BpvHolder;
 
+
         private static readonly DateTime _someVeryOldTime = new DateTime(2000, 1, 1);
+
+
         public InstrumentData(MarketConfiguration instrumentInfo)
         {
             InstrumentInfo = instrumentInfo;
@@ -57,8 +64,15 @@ namespace CoreTypes.SignalServiceClasses
             }
         }
 
-        private string _currentContract = string.Empty;
-        public void AddMinuteBar(Bar bar,string contractCode)
+        public void StartNewContract()
+        {
+            MinTimeFrame.Reset();
+            foreach (var scaledTf in ScaledTimeframes)
+                scaledTf.Reset();
+            _lastBarCloseTime = DateTime.MinValue;
+        }
+
+        public void AddMinuteBar(string contractCode, Bar bar)
         {
             if (_currentContract != contractCode)
             {
@@ -66,9 +80,17 @@ namespace CoreTypes.SignalServiceClasses
                 StartNewContract();
             }
 
+            if (bar.End <= _lastBarCloseTime) return; // ignore obsolete data 
+            _lastBarCloseTime = bar.End;
+
             MinTimeFrame.Push(bar.End, new[] { bar.O, bar.H, bar.L, bar.C });
             foreach (var scaledTf in ScaledTimeframes)
                 scaledTf.ApplyBar(bar);
+        }
+
+        public void AddHistoricalBars(string contractCode,List<Bar> historicalBars)
+        {
+//#error not implemented
         }
 
         public void ProcessTime(DateTime reachedTime)
@@ -77,12 +99,7 @@ namespace CoreTypes.SignalServiceClasses
                 scaledTf.ProcessTime(reachedTime);
 
         }
-        public void StartNewContract()
-        {
-            MinTimeFrame.Reset();
-            foreach (var scaledTf in ScaledTimeframes)
-                scaledTf.Reset();
-        }
+
     }
 
 

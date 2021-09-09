@@ -18,7 +18,7 @@ namespace CoreTypes.SignalServiceClasses
         private static readonly  List<string> _messages = new List<string>();
 
 #if DEBUG
-        public const bool IsWorking=true;
+        public const bool IsWorking=false;
 #else
         public const bool IsWorking=false;
 #endif
