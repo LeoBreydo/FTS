@@ -15,7 +15,7 @@ namespace CoreTypes
 
         private readonly Dictionary<int, StrategyInfoHolder> _strategies = new();
         private static readonly Dictionary<string, LastPriceHolder> _lastPriceHolders = new();
-        private StrategyScheduleRestrictors _scheduleRestrictors;
+        private MarketToStrategyRestrictionMapper _restrMapper;
 
         public SignalService(TradingConfiguration cfg, string strategiesFolder)
         {
@@ -42,22 +42,15 @@ namespace CoreTypes
                 }
             }
 
-            _scheduleRestrictors = new StrategyScheduleRestrictors(GetStrategyWithUsedInstruments(cfg));
+            _restrMapper = new MarketToStrategyRestrictionMapper(GetStrategyWithUsedInstruments(cfg));
             return null;
         }
 
         private static List<(int, List<string>)> GetStrategyWithUsedInstruments(TradingConfiguration cfg)
         {
-            return cfg.Exchanges.SelectMany(x => x.Markets)
-                .SelectMany(mkt => mkt.Strategies.Select(s => (s.Id, GetMarketsUsedByStrategy(mkt, s))))
-                .ToList();
+            return cfg.GetAdditionalInstruments().Select(t => (t.Item1.Id, t.Item2)).ToList();
         }
         // ReSharper disable once UnusedParameter.Local
-        private static List<string> GetMarketsUsedByStrategy(MarketConfiguration mkt, StrategyConfiguration str)
-        {
-            // in cur version we suppose that strategy uses the only main market (no additional instruments)
-            return new() {mkt.MCX()};
-        }
 
         private bool _isConnectionEstablished;
         #endregion
@@ -106,12 +99,12 @@ namespace CoreTypes
             if (tCommands?.Count > 0)
                 DebugLog.AddMsg("ApplyNewMarketRestrictions: " +
                                 string.Join(";", tCommands.Select(t => string.Format("{0} {1}", t.Item1, t.Item2))));
-            _scheduleRestrictors.ApplyNewMarketRestrictions(tCommands);
+            _restrMapper.ApplyNewMarketRestrictions(tCommands);
         }
 
         public List<ICommand> GetCommands()
         {
-            var ret= _scheduleRestrictors.GetCommands();
+            var ret= _restrMapper.GetCommands();
             if (ret?.Count > 0)
                 DebugLog.AddMsg("SignalService.GetCommands returns: " + string.Join("; ",
                     ret.Cast<RestrictionCommand>()

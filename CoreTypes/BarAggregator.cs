@@ -68,8 +68,6 @@ namespace CoreTypes
         public string SymbolExchange { get; }
         public string ContractCode { get; private set; }
 
-        private bool _newContract;
-
         public BarAggregator(MinuteAggregationRules rule, string symbolExchange, int gapInMinutes = int.MaxValue)
         {
             _gapInMinutes = gapInMinutes < 1 ? 1 : gapInMinutes;
@@ -93,8 +91,6 @@ namespace CoreTypes
                 var completed = Current;
                 completed.SetProcessedTime(utcNow);
                 Current = null;
-                var flag = _newContract;
-                _newContract = false;
                 return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
             }
             return null;
@@ -106,18 +102,14 @@ namespace CoreTypes
         /// </summary>
         /// <param name="utcNow">current time</param>
         /// <returns>aggregated bar or null</returns>
-        public Tuple<Bar, string, bool> ForceClose(DateTime utcNow)
+        public Tuple<Bar, string, string> ForceClose(DateTime utcNow)
         {
             if (Current == null) return null;
-            else
-            {
-                var completed = Current;
-                completed.SetProcessedTime(utcNow);
-                Current = null;
-                var flag = _newContract;
-                _newContract = false;
-                return new Tuple<Bar, string, bool>(completed, SymbolExchange, flag);
-            }
+
+            var completed = Current;
+            completed.SetProcessedTime(utcNow);
+            Current = null;
+            return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
         }
 
         /// <summary>
@@ -132,11 +124,11 @@ namespace CoreTypes
             if (SymbolExchange != bar.SymbolExchange) return null;
             if (ContractCode != bar.ContractCode)
             {
+                var prevCC = ContractCode;
                 ContractCode = bar.ContractCode;
-                _newContract = true;
                 var completed = Current;
                 Current = new Bar(bar);
-                return completed == null ? null : new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
+                return completed == null ? null : new Tuple<Bar, string, string>(completed, SymbolExchange, prevCC);
             }
             if (Current == null)
             {
@@ -147,8 +139,6 @@ namespace CoreTypes
                     var completed = Current;
                     completed.SetProcessedTime(utcNow);
                     Current = null;
-                    var flag = _newContract;
-                    _newContract = false;
                     return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
                 }
                 return null;
@@ -160,8 +150,6 @@ namespace CoreTypes
                 var completed = Current;
                 completed.SetProcessedTime(utcNow);
                 Current = null;
-                var flag = _newContract;
-                _newContract = false;
                 return new Tuple<Bar, string, string>(completed, SymbolExchange, ContractCode);
             }
             return null;

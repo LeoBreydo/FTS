@@ -395,7 +395,7 @@ namespace CoreTypes
             _reenterRestrictionAfterStoploss.UpdateAtStartOfBar();
         }
 
-        // inject signals of dynamic gards
+        // inject signals of dynamic guards
         public bool ValidateCurrentPosition((bool closePositionByStop, bool closePositionByTarget) dynamicRestrictions)
         {
             if (_currentPosition.Size == 0) return true;

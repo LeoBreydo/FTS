@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using CoreTypes.SignalServiceClasses;
-using static CoreTypes.MessageStringProducer;
 
 
 namespace CoreTypes
@@ -268,7 +267,6 @@ namespace CoreTypes
                 {
                     if (report.MyType == OrderStateMessageType.Post)
                         continue;
-                    var mt = _reportsRoutingMap[report.ClOrderId];
                     if (_reportsRoutingMap[report.ClOrderId].ApplyOrderReport(so.CurrentUtcTime, report, ic)) 
                         _reportsRoutingMap.Remove(report.ClOrderId);
                 }
@@ -325,6 +323,7 @@ namespace CoreTypes
         }
         public void ApplyCommand(ICommand command)
         {
+            if (command == null) return;
             var s = command.Source;
             switch (s)
             {
