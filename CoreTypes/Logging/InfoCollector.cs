@@ -32,10 +32,9 @@ namespace CoreTypes
             if (tickInfoList is { Count: > 0 })
                 TicksInfo.AddRange(tickInfoList);
         }
-        public void Accept(List<Tuple<Bar, string, string>> barInfoList)
+        public void AcceptMinuteBar(string symbolExchange, string contractCode, Bar bar)
         {
-            if(barInfoList is {Count: > 0})
-                BarsInfo.AddRange(barInfoList);
+            BarsInfo.Add(new Tuple<Bar, string, string>(bar, symbolExchange, contractCode));
         }
         public void Accept((string, int b, double mm) bpvMinMoveInfo)
         {

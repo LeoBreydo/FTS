@@ -164,8 +164,6 @@ namespace CoreTypes
             var ic = new InfoCollector();
 
             ApplyNewTicks(so,ic);
-            MakeNewOneMinuteBars(so, ic);
-
 
             ProcessContractInfos(so, ic);
             ApplyOrderReports(so, ic);
@@ -296,31 +294,24 @@ namespace CoreTypes
             }
             foreach (var cm in _contractManagers.Values) cm.ProcessContractInfo(so.CurrentUtcTime, ic);
         }
-        private void MakeNewOneMinuteBars(StateObject so, InfoCollector ic)
-        {
-            HashSet<string> acc = new();
-            List<Tuple<Bar, string, string>> newBars = new();
-            foreach (var b in so.BarUpdateList)
-            {
-                var ret = _barAggregatorMap[b.SymbolExchange].ProcessBar(b, so.CurrentUtcTime);
-                if (ret != null) newBars.Add(ret);
-                acc.Add(b.SymbolExchange);
-            }
-
-            foreach (var mc in _priceProviderMap.Keys)
-            {
-                if (acc.Contains(mc)) continue;
-                var ret = _barAggregatorMap[mc].ProcessTime(so.CurrentUtcTime);
-                if (ret != null) newBars.Add(ret);
-            }
-            ic.Accept(newBars);
-        }
         private void ApplyNewTicks(StateObject so, InfoCollector ic)
         {
             var utcNow = so.CurrentUtcTime;
-            foreach (var ti in so.TickInfoList) _priceProviderMap[ti.SymbolExchange].Update(utcNow, ti);
+
+            foreach (var ti in so.TickInfoList)
+            {
+                _priceProviderMap[ti.SymbolExchange].Update(utcNow, ti);
+                if (ti.IsLastPrice())
+                    _barAggregatorMap[ti.SymbolExchange].ProcessTick(utcNow, ti.ContractCode, ti.Value, ic);
+            }
+
+            foreach (var mc in _priceProviderMap.Keys) // todo: to optimize: loop should be called when new minute starts and just eject all aggregating bars
+                _barAggregatorMap[mc].ProcessTime(utcNow, ic);
+
+
             ic.Accept(_priceProviderMap.Select(kvp => (kvp.Key,kvp.Value.GetPriceInfo)).ToList());
         }
+
         public void ApplyCommand(ICommand command)
         {
             if (command == null) return;

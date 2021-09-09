@@ -87,13 +87,17 @@ namespace CoreTypes
             _errorsList?.Dispose();
         }
 
-        public void PostToLog(DateTime utcNow, List<string> tickInfoList, List<string> newBars,
+        public void PostToLog(DateTime utcNow, List<string> tickInfoList, List<string> newBars, List<string> historicalBars,
             List<string> newTrades, List<OrderStateMessage> orderStateMessageList,
             List<Tuple<string, string>> textMessageList, List<(string,string,string)> errorMessages)
         {
             var dt = $"{utcNow:yyyyMMdd:HHmmss}";
             foreach(var item in tickInfoList)_tiList.Add(item);
-            foreach(var item in newBars) _barList.Add(item);
+
+            if (historicalBars!=null)
+                foreach (var item in historicalBars) _barList.Add(item);
+            foreach (var item in newBars) _barList.Add(item);
+
             if (newTrades!=null)
                 foreach (var item in newTrades) _tradeList.Add(item);
             foreach(var item in orderStateMessageList) _orderStateMessages.Add(item.ToString());

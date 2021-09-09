@@ -158,7 +158,8 @@ namespace Driver
             Facade.PlaceRequest(t.Subscriptions, t.Orders);
             Client.PushInfo(t.State);
             
-            Logger.PostToLog(so.CurrentUtcTime, t.TicksInfo, t.BarsInfo, t.TradesInfo,
+            Logger.PostToLog(so.CurrentUtcTime, t.TicksInfo, t.BarsInfo, so.HistoricalBarsForLog(),
+                t.TradesInfo,
                 so.OrderStateMessageList, so.TextMessageList, t.Errors);
 
             SignalService.ApplyNewMarketRestrictions(t.Commands);

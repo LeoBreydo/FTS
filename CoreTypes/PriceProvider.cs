@@ -2,6 +2,10 @@
 
 namespace CoreTypes
 {
+    static class TickInfoHelper
+    {
+        public static bool IsLastPrice(this TickInfo ti) => ti.Tag == 4;
+    }
     public class PriceProvider
     {
         public decimal Bid=-1, Ask=-1, LastPrice=-1;
