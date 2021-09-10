@@ -78,7 +78,7 @@ namespace Driver
 
         private TradingConfiguration ReadAndVerifyConfiguration(string path)
         {
-            return TradingConfiguration.Restore(path) ?? new();
+            return TradingConfiguration.Restore(Path.GetFullPath(path));
         }
 
         private CancellationTokenSource _cts;
@@ -101,25 +101,34 @@ namespace Driver
                 {
                     while (true)
                     {
+                        DebugLog.AddMsg("Pulse",true);
                         if (_cts.Token.IsCancellationRequested)
                         {
+                            DebugLog.AddMsg("IsCancellationRequested, before PlaceStopRequest", true);
                             PlaceStopRequest();
                             var elapsedSeconds = 0;
                             while (!IsReadyToBeStooped)
                             {
-                                if (elapsedSeconds >= 120) break;
+                                if (elapsedSeconds >= 120)
+                                {
+                                    DebugLog.AddMsg("IsReadyToBeStooped TIMEOUT", true);
+                                    break;
+                                }
                                 Thread.Sleep(5000);
                                 elapsedSeconds += 5;
                             }
                             Facade.Stop();
                             Logger.Flush();
-                            if (elapsedSeconds < 120)
-                                throw new TaskCanceledException("System will be stopped properly.");
-                            throw new TaskCanceledException("System can be stopped properly, it will be stopped anyway.");
+                            //if (elapsedSeconds < 120)
+                            //throw new TaskCanceledException("System will be stopped properly.");
+                            //throw new TaskCanceledException("System can be stopped properly, it will be stopped anyway.");
+                            break;
                         }
 
                         var dt = DateTime.UtcNow;
+                        //DebugLog.AddMsg("DoWork-begin", true);
                         DoWork(dt);
+                        //DebugLog.AddMsg("DoWork-end", true);
                         var cms = (int)Math.Floor(dt.TimeOfDay.TotalMilliseconds);
                         var lastWorkDuration = cms - ms;
                         if (lastWorkDuration > 1000)
@@ -158,6 +167,14 @@ namespace Driver
             IsStopping = true;
             _cts?.Cancel();
             _workTask.Wait();
+            IsStopping = false;
+        }
+
+        public async Task StopWorkAsync()
+        {
+            IsStopping = true;
+            _cts?.Cancel();
+            await _workTask;
             IsStopping = false;
         }
 

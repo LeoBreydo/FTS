@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 using BrokerFacadeIB;
 using Driver;
@@ -50,12 +51,12 @@ namespace FTS
                 credentials = newCred;
         }
 
-        private void btnStop_Click(object sender, EventArgs e)
+        private async void btnStop_Click(object sender, EventArgs e)
         {
-            InitiateToStopTradingService(false);
+            await InitiateToStopTradingService(false);
         }
 
-        private void InitiateToStopTradingService(bool closeWhenIsDone)
+        private async Task InitiateToStopTradingService(bool closeWhenIsDone)
         {
             if (closeWhenIsDone)
                 _closeWhenIsDone = true;
@@ -63,14 +64,10 @@ namespace FTS
             Cursor = Cursors.WaitCursor;
             btnStart.Enabled = btnStop.Enabled = false;
 
-            BeginInvoke((Action)(() =>
-            {
-                _mainObject.StopWork();
-            }));
-
             _secondsLeft = 0;
             timer1.Start();
 
+            await _mainObject.StopWorkAsync();
         }
 
         private int _secondsLeft;

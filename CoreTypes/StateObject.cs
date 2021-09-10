@@ -32,7 +32,7 @@ namespace CoreTypes
 
         public List<string> HistoricalBarsForLog()
         {
-            if (HistoricalData == null || HistoricalData.Count == 0) return null;
+            if (HistoricalData.Count == 0) return null;
             return HistoricalData.SelectMany(t =>
                     t.historicalBars.Select(b =>
                         MessageStringProducer.HistoricalBarInfoString(b, t.mktExch, t.contrCode)))

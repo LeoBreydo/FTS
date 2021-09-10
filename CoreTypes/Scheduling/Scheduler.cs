@@ -14,7 +14,11 @@ namespace CoreTypes
         public Scheduler(TradingConfiguration config)
         {
             var scheduledIntervals = config.ScheduledIntervals;
-            if (scheduledIntervals == null || scheduledIntervals.Count == 0) return;
+            if (scheduledIntervals == null || scheduledIntervals.Count == 0)
+            {
+                _isEmpty = true;
+                return;
+            }
 
             _cdMap.Add(config.Id,CommandDestination.Service);
             foreach (var lex in config.Exchanges)

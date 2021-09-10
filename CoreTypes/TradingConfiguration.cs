@@ -120,7 +120,12 @@ namespace CoreTypes
     }
 
     public record ScheduledInterval(int TargetId, DateTime? SoftStopTime, DateTime HardStopTime,
-        DateTime NoRestrictionTime);
+        DateTime NoRestrictionTime)
+    {
+        public ScheduledInterval() : this(-1, null, DateTime.MinValue, DateTime.MinValue.AddMinutes(1))
+        {
+        }
+    };
 
     public class TradingConfiguration
     {
@@ -233,7 +238,7 @@ namespace CoreTypes
                 using var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
                 return (TradingConfiguration)serializer.Deserialize(fs);
             }
-            catch
+            catch(Exception exception)
             {
                 return null;
             }

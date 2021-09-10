@@ -9,7 +9,7 @@ namespace CoreTypes.SignalServiceClasses
         private static string _fileName;
         public static void SetLocation(string fileName)
         {
-            _fileName = fileName;
+            _fileName = Path.GetFullPath(fileName);
             var dir = Path.GetDirectoryName(_fileName);
             if (!Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
@@ -18,7 +18,7 @@ namespace CoreTypes.SignalServiceClasses
         private static readonly  List<string> _messages = new List<string>();
 
 #if DEBUG
-        public const bool IsWorking=false;
+        public const bool IsWorking=true;
 #else
         public const bool IsWorking=false;
 #endif

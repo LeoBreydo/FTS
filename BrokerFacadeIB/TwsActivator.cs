@@ -64,7 +64,7 @@ namespace BrokerFacadeIB
         public void Stop()
         {
             _cancellationTokenSource?.Cancel();
-            _twsProcess?.CloseMainWindow();
+            _workingTask?.Wait();
         }
 
         public void Restart()
@@ -82,7 +82,7 @@ namespace BrokerFacadeIB
         enum State { Inactive, Starting, Working, ProcessLost }
         private CancellationTokenSource _cancellationTokenSource;
 
-        private State _state;
+        private volatile State _state;
         private Process _twsProcess;
 
         private int _counter;
@@ -101,10 +101,13 @@ namespace BrokerFacadeIB
                         SecondPulse();
                         Thread.Sleep(1000);
                     }
+
+                    if (_state == State.Starting)
+                        CloseStartingApplication();
                 }
                 catch (Exception e)
                 {
-                    DebugLog("Failed " + e);
+                    DebugLog("TWS Activator MainLoop failed by exception: " + e);
                 }
                 finally
                 {
@@ -112,11 +115,38 @@ namespace BrokerFacadeIB
                     _cancellationTokenSource = null;
                     SetState(State.Inactive);
                     DebugLog("Finished");
-
+                    _workingTask = null;
                 }
 
             }, TaskCreationOptions.LongRunning
                 , _cancellationTokenSource.Token);
+        }
+
+        private void CloseStartingApplication()
+        {
+            if (_twsProcess == null || _twsProcess.HasExited)
+                return;
+
+            //DebugLog(string.Format("Stop(3A): _state={0}, hasProc={1}, title={2}", _state, _twsProcess == null ? "n" : "y",
+            //    _lastTitle));
+
+            try
+            {
+                while ((DateTime.UtcNow- _stateStartedTime).TotalSeconds< LIMIT_IN_SEC__FOR_MAINWNDTITLE__When_Initializing)
+                {
+                    if (_twsProcess.HasExited) return;
+
+                    var title = _twsProcess.GetMainWindowTitle();
+                    if (title?.IndexOf("Interactive Brokers", StringComparison.OrdinalIgnoreCase) >= 0)
+                        break;
+                    
+                    Thread.Sleep(1000);
+                }
+                _twsProcess.CloseMainWindow();
+            }
+            catch 
+            {
+            }
         }
 
         private void SecondPulse()
@@ -138,10 +168,12 @@ namespace BrokerFacadeIB
             }
         }
 
+        private DateTime _stateStartedTime;
         private void SetState(State state)
         {
             _state = state;
-            
+            _stateStartedTime=DateTime.UtcNow;
+
             DebugLog("State " + state);
             switch (_state)
             {
@@ -266,6 +298,8 @@ namespace BrokerFacadeIB
         }
         private void LaunchTws()
         {
+            if (_cancellationTokenSource.Token.IsCancellationRequested) return;
+                
             DebugLog("LaunchTws");
             try
             {

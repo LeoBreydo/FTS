@@ -23,7 +23,7 @@ namespace BrokerFacadeIB
         private readonly ConcurrentDictionary<string, Contract> _symbolAndExchangeToContract;
 
         private readonly BlockingCollection<TickInfo> _quoteQueue = new();
-        private readonly BlockingCollection<ContractDetails> _contractQueue = new();
+        private readonly BlockingCollection<ContractInfo> _contractQueue = new();
 
         private readonly BlockingCollection<Tuple<string, string>> _textMessageQueue;
         private readonly BlockingCollection<(string mktExch, string contrCode,List<Bar> history)> _loadedHistory=new ();
@@ -56,29 +56,21 @@ namespace BrokerFacadeIB
         public (List<TickInfo>, List<ContractInfo>, List<(string mktExch, string contrCode, List<Bar> historicalBars)>) 
             GetState()
         {
-            var cnt = _quoteQueue.Count;
-            var consumed = 0;
-            List<TickInfo> qtList = new();
-            if (cnt > 0) 
-                foreach (TickInfo ti in _quoteQueue.GetConsumingEnumerable())
-                {
-                    qtList.Add(ti);
-                    if (++consumed == cnt) break;
-                }
-
-            cnt = _contractQueue.Count;
-            List<ContractInfo> ciList = new();
-            if (cnt > 0)
+            return (GetValues(_quoteQueue), GetValues(_contractQueue), GetValues(_loadedHistory));
+        }
+        static List<T> GetValues<T>(BlockingCollection<T> queue)
+        {
+            var ret = new List<T>();
+            int cnt = queue.Count;
+            if (cnt == 0) return ret;
+            int consumed = 0;
+            foreach (var v in queue.GetConsumingEnumerable())
             {
-                consumed = 0;
-                foreach (var ci in _contractQueue.GetConsumingEnumerable())
-                {
-                    ciList.Add(new ContractInfo(ci));
-                    if (++consumed == cnt) break;
-                }
+                ret.Add(v);
+                if (++consumed == cnt) break;
             }
 
-            return (qtList, ciList, _loadedHistory.GetConsumingEnumerable().ToList());
+            return ret;
         }
 
 
@@ -159,7 +151,7 @@ namespace BrokerFacadeIB
                 ));
 
 
-            _contractQueue.Add(contractDetails.Details);
+            _contractQueue.Add(new ContractInfo(contractDetails.Details));
         }
 #if WORKWITH_DELAYED_DATA
         int TransformDelayedTagToMainTag(int field)
