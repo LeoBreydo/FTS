@@ -64,8 +64,7 @@ namespace BrokerFacadeIB
         public void Stop()
         {
             _cancellationTokenSource?.Cancel();
-            _workingTask?.Wait();
-        }
+       }
 
         public void Restart()
         {
@@ -115,7 +114,6 @@ namespace BrokerFacadeIB
                     _cancellationTokenSource = null;
                     SetState(State.Inactive);
                     DebugLog("Finished");
-                    _workingTask = null;
                 }
 
             }, TaskCreationOptions.LongRunning
