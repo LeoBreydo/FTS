@@ -109,7 +109,7 @@ namespace Driver
                             var elapsedSeconds = 0;
                             while (!IsReadyToBeStooped)
                             {
-                                if (elapsedSeconds >= 120)
+                                if (elapsedSeconds >= Configuration.GeneralSettings.CloseAllTimeout)
                                 {
                                     DebugLog.AddMsg("IsReadyToBeStooped TIMEOUT", true);
                                     break;
@@ -186,6 +186,8 @@ namespace Driver
             var clientCmdList = Client.GetCommands();
             var schedulerCmdList = Scheduler.GetCommands(so.CurrentUtcTime);
             var icCommands = SignalService.GetCommands();
+            if(_stoppedByHost) clientCmdList.Add(new RestrictionCommand(CommandDestination.Service, 
+                CommandSource.User,TService.Id,TradingRestriction.HardStop));
             var t = TService.ProcessCurrentState(so, clientCmdList, schedulerCmdList, icCommands);
             Facade.PlaceRequest(t.Subscriptions, t.Orders);
             Client.PushInfo(t.State);
