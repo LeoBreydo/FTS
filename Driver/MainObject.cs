@@ -28,7 +28,7 @@ namespace Driver
         public SignalService SignalService => TService.SignalService;
         
 
-        private bool _stoppedByHost = false;
+        private volatile bool _stoppedByHost = false;
 
         public static bool Create(IBCredentials credentials, out MainObject mainObject,out string error)
         {
