@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using BrokerFacadeIB;
+using CoreTypes;
 
 namespace Driver
 {
@@ -8,6 +9,12 @@ namespace Driver
     {
         static void Main(string[] args)
         {
+            //var c1 = TradingConfiguration.Restore(@"D:\Work_VS2019\FTS_Project\FTS\FTS\bin\Debug\net5.0-windows\cfg.xml");
+            //c1.ScheduledIntervals.Add(new ScheduledInterval(1, null, new DateTime(2000, 1, 1), new DateTime(2001, 1, 1)));
+            //c1.ScheduledIntervals.Add(new ScheduledInterval(1, new DateTime(2009, 12, 31), new DateTime(2010, 1, 1), new DateTime(2011, 1, 1)));
+            //c1.Save(@"D:\Work_VS2019\FTS_Project\FTS\FTS\bin\Debug\net5.0-windows\cfg_withSchedule.xml");
+            //return;
+
             if (!MainObject.Create(ReadIBCredentials(), out MainObject mo, out string error))
             {
                 Console.WriteLine("Failed to initialize trading service: " + error);

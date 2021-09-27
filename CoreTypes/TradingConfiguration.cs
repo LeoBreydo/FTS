@@ -4,12 +4,15 @@ using System.IO;
 using System.Linq;
 using System.Text.Json.Serialization;
 using System.Xml.Serialization;
-using Binosoft.TraderLib.Indicators;
+//using Binosoft.TraderLib.Indicators;
 using Newtonsoft.Json.Converters;
 using TimeZoneConverter;
 
+//using TimeZoneConverter;
+
 namespace CoreTypes
 {
+#if !cut
     /// <summary>
     /// Общие настройки по исполнению ордеров и обновлению информации о конфигурации
     /// </summary>
@@ -21,11 +24,11 @@ namespace CoreTypes
         /// <summary>
         /// Update the cofiguration info each N seconds
         /// </summary>
-        public readonly int RefreshStateFrequency = 3;
+        public readonly int RefreshStateFrequency = 3; // Keep ALIVE!
         /// <summary>
         /// CloseAll timeout when TradingService is shutting down in seconds
         /// </summary>
-        public int CloseAllTimeout = 30;
+        public int CloseAllTimeout = 30;  // Keep ALIVE!
 
         #endregion
         #region order execution settings
@@ -40,7 +43,7 @@ namespace CoreTypes
         /// <summary>
         /// The timeout of the order execution report from broker in seconds
         /// </summary>
-        public readonly int ResponseTimeoutInSeconds = 12;
+        public readonly int ResponseTimeoutInSeconds = 12; //alive
         /// <summary>
         /// To post the TooLongExecutionWarning message every N seconds of the order execution
         /// </summary>
@@ -100,7 +103,7 @@ namespace CoreTypes
             return Verify() == null;
         }
     }
-
+#endif
     public class ScheduledIntervalDescription
     {
         public string EnterTimeZoneName { get; set; }
@@ -132,7 +135,7 @@ namespace CoreTypes
         public int Id = -1;
         public DateTime StartedAt { get; set; }
         public int NextId { get; set; }
-        public GeneralSettings GeneralSettings { get; set; } = new();
+        //public GeneralSettings GeneralSettings { get; set; } = new();
         public List<ExchangeConfiguration> Exchanges { get; set; } = new();
         public int MaxErrorsPerDay = 0;
 
@@ -198,9 +201,9 @@ namespace CoreTypes
 
             if (Id < 0) return "TradingConfiguration.Id must be non-negative";
             IDs.Add(Id);
-            if (GeneralSettings == null) return "General Settings is not specified";
-            var error = GeneralSettings.Verify();
-            if (error != null) return "Invalid General Settings: " + error;
+            //if (GeneralSettings == null) return "General Settings is not specified";
+            //var error = GeneralSettings.Verify();
+            //if (error != null) return "Invalid General Settings: " + error;
             if (Exchanges == null || Exchanges.Count == 0) return "Exchanges are undefined";
             if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
 
@@ -303,7 +306,7 @@ namespace CoreTypes
     }
     public class MarketConfiguration
     {
-        public int Id = -1;
+        public int Id = -1; 
         public string MarketName = "UNK";
         public string Exchange = "UNK";
         public int BigPointValue = -1;
@@ -429,8 +432,8 @@ namespace CoreTypes
         public string StopGuardLongExpression = string.Empty;
         public string StopGuardShortExpression = string.Empty;
 
-        public bool ActiveTargetGuard = true;
-        public bool ActiveStopGuard = true;
+        //public bool ActiveTargetGuard = true;
+        //public bool ActiveStopGuard = true;
 
         public DynamicGuard() { }
         public DynamicGuard(DynamicGuard from)
@@ -443,11 +446,11 @@ namespace CoreTypes
             StopGuardLongExpression = from.StopGuardLongExpression;
             StopGuardShortExpression = from.StopGuardShortExpression;
 
-            ActiveTargetGuard = from.ActiveTargetGuard;
-            ActiveStopGuard = from.ActiveStopGuard;
+            //ActiveTargetGuard = from.ActiveTargetGuard;
+            //ActiveStopGuard = from.ActiveStopGuard;
         }
 
-        public void Normalize(Func<string, string> normalizeIndicator, bool restoreActiveFlag = true)
+        public void Normalize(Func<string, string> normalizeIndicator)//, bool restoreActiveFlag = true)
         {
             if (TargetMode == DynamicGuardMode.NotUse)
             {
@@ -470,14 +473,14 @@ namespace CoreTypes
                 StopGuardLongExpression = normalizeIndicator(StopGuardLongExpression ?? "");
                 StopGuardShortExpression = normalizeIndicator(StopGuardShortExpression ?? "");
             }
-            if (restoreActiveFlag)
-                ActiveTargetGuard = ActiveStopGuard = true; // this setting is used in the TradingServer only for the temporary switching off
+            //if (restoreActiveFlag)
+            //    ActiveTargetGuard = ActiveStopGuard = true; // this setting is used in the TradingServer only for the temporary switching off
         }
 
         public bool EqualsTo(DynamicGuard other, Func<string, string> normalizeIndicator)
         {
             if (TargetMode != other.TargetMode || StopMode != other.StopMode) return false;
-            if (ActiveTargetGuard != other.ActiveTargetGuard || ActiveStopGuard != other.ActiveStopGuard) return false;
+            //if (ActiveTargetGuard != other.ActiveTargetGuard || ActiveStopGuard != other.ActiveStopGuard) return false;
             if (TargetMode != DynamicGuardMode.NotUse)
             {
                 if (normalizeIndicator(TargetGuardLongExpression ?? "") !=
@@ -570,7 +573,7 @@ namespace CoreTypes
 
         public DynamicGuard DynamicGuardDescription = new();
 
-        public int StoplossRestriction_MaxBarsToWaitForOppositeSignal = 1000;
+        public int StoplossRestriction_MaxBarsToWaitForOppositeSignal = 0;
         public bool StoplossRestriction_GoToFlatMustLiftRestriction = true;
 
         public List<string> GetAdditionalInstruments(string mainInstrument)

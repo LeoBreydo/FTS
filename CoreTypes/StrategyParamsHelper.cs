@@ -17,7 +17,7 @@ namespace CoreTypes
         private static string ExtractInstrumentNameFromParam(string tfParam)
         {
             // instrument is expected in square brackets like '[MKT]' or '[MKT]:t:imeframe'
-            if (tfParam.StartsWith('['))
+            if (tfParam.StartsWith("["))
             {
                 var closeIndex=tfParam.IndexOf(']');
                 if (closeIndex < 0) closeIndex = tfParam.Length;
