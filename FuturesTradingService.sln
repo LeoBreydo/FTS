@@ -13,6 +13,8 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Driver", "Driver\Driver.csp
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "FTS", "FTS\FTS.csproj", "{5A831696-1B4F-4E26-BB0A-24F51EF75CE1}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebClientObjects", "WebClientObjects\WebClientObjects.csproj", "{AFD961BA-5EF0-41CB-BF3C-72166981D92C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{5A831696-1B4F-4E26-BB0A-24F51EF75CE1}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5A831696-1B4F-4E26-BB0A-24F51EF75CE1}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5A831696-1B4F-4E26-BB0A-24F51EF75CE1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AFD961BA-5EF0-41CB-BF3C-72166981D92C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AFD961BA-5EF0-41CB-BF3C-72166981D92C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AFD961BA-5EF0-41CB-BF3C-72166981D92C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AFD961BA-5EF0-41CB-BF3C-72166981D92C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
