@@ -195,7 +195,7 @@ namespace CoreTypes
             var msgToClient = new List<Tuple<string, string>>();
             msgToClient.AddRange(so.TextMessageList);
             msgToClient.AddRange(errorMessages.Select(em => new Tuple<string,string>("Error",em.txt)));
-            return new TradingServiceState(msgToClient, this);
+            return new TradingServiceState(msgToClient, so.IsConnectionEstablished, this);
         }
 
         private void GenerateOrders(DateTime utcNow, InfoCollector ic)
