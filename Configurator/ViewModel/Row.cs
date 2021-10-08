@@ -9,64 +9,78 @@ namespace Configurator.ViewModel
 {
     public enum RowType
     {
-        Unknown=-1,
-        //TCfg=0,
-        Exchanges=0,
-        Markets=1,
-        Strategies=2
+        Unknown,
+        Strategies,
+        Markets,
+        Exchanges,
+        TCfg,
     };
     public interface IRow
     {
         RowType GetRowType();
         object GetPropertyGridEditor(PropertyGrid pg);
         string GetTitle();
-    }
+        List<PropertyValue> GetAttributes();
+        string[] KeyPath();
+        int GetId();
+        void SetId(int id);
 
-    static class ConvertHelper
-    {
-        public static int? MaxErrorsToUser(int maxErrorsPerDay)
-        {
-            if (maxErrorsPerDay == int.MaxValue) return null;
-            return maxErrorsPerDay;
-        }
-        public static int AcceptMaxErrors(int? value)//maxErrorsPerDay_or_null
-        {
-            if (!value.HasValue)
-                return Int32.MaxValue;
-
-            int v = value.Value;
-            if (v < 0) throw new Exception("MaxErrorsPerDay must be not-negative or empty");
-            return v;
-        }
+        int ID { get; }
     }
 
     public class TCfgRow : IRow
     {
-        private readonly TradingConfiguration _tcfg;
-
-        public TCfgRow(TradingConfiguration tcfg)
+        public int ID => GetId();
+        private readonly TradingConfiguration Cfg;
+        private readonly Controller _controller;
+        public TCfgRow(Controller controller, TradingConfiguration cfg)
         {
-            _tcfg = tcfg;
+            _controller = controller;
+            Cfg = cfg;
         }
         public object GetPropertyGridEditor(PropertyGrid pg)
         {
-            return new TCfgPGEditor(_tcfg);
+            return new TCfgPGEditor(Cfg, _controller);
         }
 
         public RowType GetRowType()
         {
-            return RowType.Unknown;
+            return RowType.TCfg;
         }
 
         public string GetTitle() => "Trading Configuration";
+        public List<PropertyValue> GetAttributes() => null;
+        public string[] KeyPath() => null;
+        public int GetId() => Cfg.Id;
+        public void SetId(int id) => Cfg.Id = id;
+        public string Verify()
+        {
+            if (Cfg.MaxErrorsPerDay < 0) return "Invalid MaxErrorsPerDay, value must be >=0 ";
+            if (Cfg.SchedulerTimeStepInMinutes < 1 || Cfg.SchedulerTimeStepInMinutes > 30)
+                return "SchedulerTimeStepInMinutes is not valid (must be integer and in [1;30] range)";
+
+            return null;
+        }
     }
     public class ExchangeRow : BaseNotifyPropertyChanged, IRow
     {
+        public int ID => GetId();
+        public readonly ExchangeConfiguration Cfg;
+        private List<PropertyValue> Attributes;
+
+        #region IRow
         public RowType GetRowType() => RowType.Exchanges;
         public object GetPropertyGridEditor(PropertyGrid pg) => new ExchangePGEditor(this);
         public string GetTitle() => "Exchange " + Cfg.ExchangeName;
+        public List<PropertyValue> GetAttributes() => Attributes;
+        public string[] KeyPath() => new []{ Exchange };
+        public int GetId() => Cfg.Id;
+        public void SetId(int id) => Cfg.Id = id;
 
-        public ExchangeConfiguration Cfg;
+        #endregion
+
+        public ExchangeRow(ExchangeConfiguration cfg) { Cfg = cfg; }
+
         public string Configuration => Controller.STR_Configuration;
         public string Exchange => Cfg.ExchangeName;
 
@@ -75,8 +89,6 @@ namespace Configurator.ViewModel
             get => Cfg.Currency;
             set => SetField(ref Cfg.Currency, Controller.Instance.ListOfCurrencies.AcceptCurrency(value));
         }
-
-
         public int? MaxErrorsPerDay
         {
             get => ConvertHelper.MaxErrorsToUser(Cfg.MaxErrorsPerDay);
@@ -86,18 +98,41 @@ namespace Configurator.ViewModel
         {
             return Cfg.Markets.Any(m => m.Strategies.Any(s => s.NbrOfContracts > 0));
         }
+        public void SetAttr(List<PropertyValue> attributes) { Attributes = attributes; }
+
+        public string Verify(List<int> IDs, List<string> exchanges, List<string> currencies)
+        {
+            return Cfg.VerifyMe(IDs, exchanges, currencies);
+        }
+
+
     }
     public class MarketRow : BaseNotifyPropertyChanged, IRow
     {
+        public int ID => GetId();
+        public readonly MarketConfiguration Cfg;
+        private List<PropertyValue> Attributes;
+
+        #region IRow
         public RowType GetRowType() => RowType.Markets;
         public object GetPropertyGridEditor(PropertyGrid pg) => new MarketPGEditor(this);
         public string GetTitle() => $"Market {Cfg.MarketName} at {Cfg.Exchange}";
+        public List<PropertyValue> GetAttributes() => Attributes;
+        public string[] KeyPath() => new[] { Exchange, MarketName };
+        public int GetId() => Cfg.Id;
+        public void SetId(int id) => Cfg.Id = id;
 
-        public MarketConfiguration Cfg; // is not null if market is included to TradingConfiguration
-        public List<PropertyValue> Properties;
+        #endregion
+
+        public MarketRow(MarketConfiguration cfg, List<PropertyValue> attributes = null)
+        {
+            Cfg = cfg;
+            Attributes = attributes;
+        }
         public string Configuration => Controller.STR_Configuration;
         public string Exchange => Cfg.Exchange;
         public string MarketName => Cfg.MarketName;
+
 
         public int BigPointValue
         {
@@ -156,23 +191,39 @@ namespace Configurator.ViewModel
         {
             return Cfg.Strategies.Any(s => s.NbrOfContracts > 0);
         }
+        public void SetAttr(List<PropertyValue> attributes) { Attributes = attributes; }
 
+        public string Verify(List<int> IDs, List<string> mktExs)
+        {
+            string err= Cfg.VerifyMe(IDs, mktExs);
+            if (err != null) return err;
+            if (MaxNbrContracts.HasValue && MaxNbrContracts < SumOfStrategyContracts)
+                return "MaxNbrContracts restriction is not satisfied";
+            return null;
+        }
     }
 
 
     public class StrategyRow: BaseNotifyPropertyChanged,IRow
     {
+        public int ID => GetId();
+        public StrategyConfiguration Cfg;
+        private List<PropertyValue> Attributes;
+
+        #region IRow
         public RowType GetRowType() => RowType.Strategies;
         public object GetPropertyGridEditor(PropertyGrid pg) => new StrategyPGEditor(this, pg);
-        public string GetTitle() => $"Strategy {Cfg.StrategyName} at  {Exchange}/{MarketName}";
+        public string GetTitle() => $"Strategy {Cfg.StrategyName} at  {Exchange}/{Market}";
+        public List<PropertyValue> GetAttributes()=> Attributes;
+        public string[] KeyPath() => new[] {Exchange, Market, StrategyName};
+        public int GetId() => Cfg.Id;
+        public void SetId(int id) => Cfg.Id = id;
+        #endregion
 
-        public readonly SignalGeneratorDescription SGDescription;
-        public StrategyConfiguration Cfg;
-        public List<PropertyValue> Properties;
         // grouping keys
         public string Configuration => Controller.STR_Configuration;
         public string Exchange { get; }
-        public string MarketName { get; }
+        public string Market { get; }
 
         private int _lastPositiveNumLots = 1;
         public bool InWorkingSet
@@ -203,8 +254,7 @@ namespace Configurator.ViewModel
             }
         }
 
-        //public string Name => Path.GetFileNameWithoutExtension(SignalGeneratorDescription.ShortDllName);
-        public string Name
+        public string StrategyName
         {
             get=> Cfg.StrategyName;// Path.GetFileNameWithoutExtension(SignalGeneratorDescription.ShortDllName);
             set
@@ -216,13 +266,22 @@ namespace Configurator.ViewModel
                 SetField(ref Cfg.StrategyName, value);
             }
         }
-        public string TimeFrame => Cfg.Timeframe;// ?? SignalGeneratorDescription.SearchTimeFrame;
+        public string TimeFrame => Cfg.Timeframe;
 
-        public StrategyRow(string exchange, string mktName, SignalGeneratorDescription sgd)
+        public StrategyRow(string exchange, string mktName, StrategyConfiguration cfg)
         {
             Exchange = exchange;
-            MarketName = mktName;
-            SGDescription = sgd;
+            Market = mktName;
+            //SGDescription = null;
+            Cfg = cfg;
+            UpdateSummaryCells();
+
+        }
+
+        public StrategyRow(string exchange, string mktName, SignalGeneratorDescription sgd, List<PropertyValue> attributes)
+        {
+            Exchange = exchange;
+            Market = mktName;
             Cfg = new StrategyConfiguration
             {
 
@@ -230,10 +289,34 @@ namespace Configurator.ViewModel
                 StrategyDll = sgd.ShortDllName,
                 Timeframe = sgd.SearchTimeFrame,
                 ModelID = sgd.ModelID,
-                StrategyParameters = sgd.CloneDefautParameters()
+                //StrategyParameters = sgd.CloneDefautParameters() - will be initiated in SetSignalGeneratorDescription
             };
+            SetDescription(sgd);
+            Attributes = attributes;
             UpdateSummaryCells();
         }
+
+        private SignalGeneratorDescription SGDescription;
+        public SignalGeneratorDescription GetDescription()
+        {
+            return SGDescription;
+        }
+        public void SetDescription(SignalGeneratorDescription sgd)
+        {
+            SGDescription = sgd;
+            var oldParams = Cfg.StrategyParameters;
+            Cfg.StrategyParameters = sgd == null
+                ? new StrategyParameters()
+                : sgd.CloneDefautParameters();
+
+            if (oldParams != null)
+            {
+                foreach (StrategyParameter p in oldParams.Parameters)
+                    Cfg.StrategyParameters.SetValue(p.Name, p.Value);
+            }
+        }
+
+        public void SetAttr(List<PropertyValue> attributes) { Attributes = attributes; }
 
         public void SetFixedStopLossDelta(double newVal)
         {
@@ -333,5 +416,14 @@ namespace Configurator.ViewModel
                 Cfg.StoplossRestriction_GoToFlatMustLiftRestriction ? "OppositeOrFlat" : "Opposite"
             );
         }
+
+        public string Verify(List<int> IDs, List<string> strategyNames, IndicatorsVerificator indVerificator)
+        {
+            if (SGDescription==null)
+                return "Strategy Dll not found";
+
+            return Cfg.Verify(IDs, strategyNames, indVerificator, SGDescription);
+        }
+
     }
 }

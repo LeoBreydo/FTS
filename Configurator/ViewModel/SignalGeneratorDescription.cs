@@ -45,14 +45,14 @@ namespace Configurator.ViewModel
         public string SearchInstrument;
         public string SearchTimeFrame;
         public StrategyParameters DefaultParameters;
-        public double MaxVotes;
+        public int MaxVotes;
         public string[] IndicatorExpressions;
         public bool ContainsTradingZones = true;
         public DefaultMarketFilters DefaultMarketFilters;
 
         public SignalGeneratorDescription() { }
         public SignalGeneratorDescription(string shortDllName, string modelID, string searchInstrument, string searchTimeFrame, string[] indicatorExpressions, bool containsTradingZones,
-            StrategyParameters defaltParameters, double maxVotes = 0, DefaultMarketFilters defaultMarketFilters = null)
+            StrategyParameters defaltParameters, int maxVotes = 0, DefaultMarketFilters defaultMarketFilters = null)
         {
             ShortDllName = shortDllName;
             ModelID = modelID;
@@ -70,10 +70,10 @@ namespace Configurator.ViewModel
             return new StrategyParameters(DefaultParameters);
         }
 
-        public bool IsAdditionalTimeFrame(string paramName)
-        {
-            return paramName.StartsWith("Timeframe", StringComparison.OrdinalIgnoreCase);
-        }
+        //public bool IsAdditionalTimeFrame(string paramName)
+        //{
+        //    return paramName.StartsWith("Timeframe", StringComparison.OrdinalIgnoreCase);
+        //}
         public Type GetParamType(string paramName)
         {
             switch (paramName)
@@ -109,7 +109,7 @@ namespace Configurator.ViewModel
                 case "MinVotes":
                     if (MaxVotes <= 0) return ""; // unexpected use, this is not a committee
                     return "Committee MinVotes threshold. Must have positive numeric value <= " + MaxVotes;
-                case "QuorumQuorum":
+                case "Quorum":
                     if (MaxVotes <= 0) return ""; // unexpected use, this is not a committee
                     return "Committee Quorum threshold. Must have positive numeric value <= " + MaxVotes;
             }
@@ -136,15 +136,16 @@ namespace Configurator.ViewModel
 
                 case "MinVotes":
                 case "Quorum":
-                    if (MaxVotes <= 0) return null; // ignore
+                    if (MaxVotes <= 0) return null; // ignore, no maxVotes restriction
                     var val = (int)value;
                     return (val > 0 && val < MaxVotes)
                         ? null
                         : "Expected the positive numeric value <= " + MaxVotes;
                 default:
                     return null;
-                    //if (!paramName.IsAdditionalTimeFrame())
-                        
+
+                    //if (!paramName.IsAdditionalTimeFrame()) // todo to when work with additional timeframes - make editor and check the edited value
+
 
                     //if (string.IsNullOrWhiteSpace(value.ToString()))
                     //    return string.Format("Value is not specified for signal generator parameter '{0}'", paramName);

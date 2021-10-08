@@ -132,20 +132,34 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="RenameDlg.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="RenameDlg.Designer.cs">
+      <DependentUpon>RenameDlg.cs</DependentUpon>
+    </Compile>
+    <Compile Include="ScheduleRecordEditor.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="ScheduleRecordEditor.Designer.cs">
+      <DependentUpon>ScheduleRecordEditor.cs</DependentUpon>
+    </Compile>
     <Compile Include="Tools\GridViewStateEx.cs" />
+    <Compile Include="UserSettings.cs" />
+    <Compile Include="ViewModel\ConvertHelper.cs" />
     <Compile Include="ViewModel\IndicatorEditor.cs" />
     <Compile Include="ViewModel\IndicatorsVerificator.cs" />
     <Compile Include="Tools\BaseController.cs" />
     <Compile Include="Tools\BaseNotifyPropertyChanged.cs" />
     <Compile Include="ViewModel\Controller.cs" />
     <Compile Include="ViewModel\ListOfCurrencies.cs" />
-    <Compile Include="ViewModel\MarketPGEditor.cs" />
+    <Compile Include="ViewModel\PropertyGridEditors.cs" />
     <Compile Include="ViewModel\PropertyValue.cs" />
     <Compile Include="ViewModel\SignalGeneratorDescription.cs" />
     <Compile Include="ViewModel\SignalGeneratorsRegistryMaker.cs" />
     <Compile Include="ViewModel\StrategyPGEditor.cs" />
     <Compile Include="Tools\StringHelper.cs" />
-    <Compile Include="ViewModel\StrategyRow.cs" />
+    <Compile Include="ViewModel\Row.cs" />
     <Compile Include="Tools\DxForcePropagateCheckBoxValuesToDataSource.cs" />
     <Compile Include="Form1.cs">
       <SubType>Form</SubType>
@@ -173,6 +187,12 @@
       <DependentUpon>Resources.resx</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
+    <EmbeddedResource Include="RenameDlg.resx">
+      <DependentUpon>RenameDlg.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="ScheduleRecordEditor.resx">
+      <DependentUpon>ScheduleRecordEditor.cs</DependentUpon>
+    </EmbeddedResource>
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
       <Generator>SettingsSingleFileGenerator</Generator>

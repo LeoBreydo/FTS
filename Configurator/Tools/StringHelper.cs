@@ -15,9 +15,9 @@ namespace Configurator
             return true;
         }
 
-        public static bool IsUnk(this string txt)
-        {
-            return string.IsNullOrEmpty(txt) || string.Equals(txt, "UNK", StringComparison.OrdinalIgnoreCase);
-        }
+        //public static bool IsUnk(this string txt)
+        //{
+        //    return string.IsNullOrEmpty(txt) || string.Equals(txt, "UNK", StringComparison.OrdinalIgnoreCase);
+        //}
     }
 }

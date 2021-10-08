@@ -8,11 +8,12 @@ namespace Configurator.ViewModel
 
 
         private readonly TradingConfiguration _info;
+        private readonly Controller _controller;
 
-        public TCfgPGEditor(TradingConfiguration info)
+        public TCfgPGEditor(TradingConfiguration info,Controller controller)
         {
-            // todo ID
             _info = info;
+            _controller = controller;
             Properties.Add(new PropertySpec("MaxErrorsPerDay", typeof(int?), CAT_SETTINGS));
             Properties.Add(new PropertySpec("SchedulerTimeStepInMinutes", typeof(int), CAT_SETTINGS,"Frequency of Scheduler actions in minutes, value must be in range [1..30]"));
 
@@ -28,7 +29,9 @@ namespace Configurator.ViewModel
                 case "MaxErrorsPerDay":
                     e.Value = ConvertHelper.MaxErrorsToUser(_info.MaxErrorsPerDay);
                     break;
-                // todo!!! case "SchedulerTimeStepInMinutes":
+                case "SchedulerTimeStepInMinutes":
+                    e.Value = _info.SchedulerTimeStepInMinutes;
+                    break;
             }
 
         }
@@ -41,6 +44,10 @@ namespace Configurator.ViewModel
                 case "MaxErrorsPerDay":
                     _info.MaxErrorsPerDay = ConvertHelper.AcceptMaxErrors((int?) e.Value);
                     break;
+                case "SchedulerTimeStepInMinutes":
+                    _controller.SetSchedulerTimeStepInMinutes((int)e.Value);
+                    break;
+
             }
         }
     }
@@ -55,8 +62,6 @@ namespace Configurator.ViewModel
 
         public MarketPGEditor(MarketRow info)
         {
-            // todo ID
-
             _info = info;
             Properties.Add(new PropertySpec(" Exchange", typeof(string), CAT_MAIN) { ReadOnly = true });
             Properties.Add(new PropertySpec(" Market", typeof(string), CAT_MAIN) { ReadOnly = true });
@@ -137,7 +142,6 @@ namespace Configurator.ViewModel
 
         public ExchangePGEditor(ExchangeRow info)
         {
-            // todo ID
             _info = info;
             Properties.Add(new PropertySpec(" Exchange", typeof(string), CAT_MAIN) { ReadOnly = true });
             Properties.Add(new PropertySpec("Currency", typeof(string), CAT_MAIN, "Currency", typeof(ComboEditor),

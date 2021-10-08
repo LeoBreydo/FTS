@@ -12,7 +12,7 @@ using DevExpress.XtraGrid.Views.Grid;
 
 namespace Configurator.Tools
 {
-#if hide
+#if notUsed
     public enum CustomColumnType
     {
         Decimal,
@@ -77,7 +77,7 @@ namespace Configurator.Tools
 #endif
     public static class GridViewStateEx
     {
-#if tmp
+#if notUsed
         public static GridViewState GetGridViewState(this GridView gridView)
         {
             int row = GridControl.InvalidRowHandle;

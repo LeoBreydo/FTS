@@ -27,7 +27,7 @@ namespace Configurator.ViewModel
                     var ixDelim = row.IndexOf(delimiter);
                     if (ixDelim < 0)
                         return new PropertyValue(row.Trim(), String.Empty);
-                    return new PropertyValue(row.Substring(0, delimiter).Trim(), row.Substring(delimiter + 1).Trim());
+                    return new PropertyValue(row.Substring(0, ixDelim).Trim(), row.Substring(ixDelim + 1).Trim());
                 }).Where(item => item != null).ToList();
                 return ret;
 

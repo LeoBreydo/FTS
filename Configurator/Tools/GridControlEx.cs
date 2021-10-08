@@ -179,6 +179,37 @@ namespace Configurator
             }
         }
         #endregion
+        public static int? Find(this GridView gridView, Func<int, bool> match)
+        {
+            if (gridView.GroupCount == 0)
+            {
+                for (int rowHandle = 0; rowHandle < gridView.RowCount; rowHandle++)
+                    if (match(rowHandle))
+                        return rowHandle;
+                return null;
+            }
+
+            for (int rowHandle = -1; gridView.IsValidRowHandle(rowHandle); --rowHandle)
+            {
+                if (match(rowHandle))
+                    return rowHandle;
+
+                int childRH = gridView.GetChildRowHandle(rowHandle, 0);
+                if (childRH >= 0)
+                {
+                    if (match(childRH))
+                        return childRH;
+                    int nChildren = gridView.GetChildRowCount(rowHandle);
+                    for (int ixChild = 1; ixChild < nChildren; ++ixChild)
+                    {
+                        childRH = gridView.GetChildRowHandle(rowHandle, ixChild);
+                        if (match(childRH))
+                            return childRH;
+                    }
+                }
+            }
+            return null;
+        }
 
     }
 }

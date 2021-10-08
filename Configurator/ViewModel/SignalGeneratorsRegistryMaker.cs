@@ -9,6 +9,7 @@ namespace Configurator.ViewModel
 {
     public static class SignalGeneratorsRegistryMaker
     {
+#if notUsed
         public static List<SignalGeneratorDescription> LoadDllsFromFolder(string folderName, out List<string> errorsList)
         {
             errorsList = new List<string>();
@@ -36,7 +37,7 @@ namespace Configurator.ViewModel
             }
             return result;
         }
-
+#endif
         public static string GetDescription(string strategyDll, out SignalGeneratorDescription sd)
         {
             try
@@ -88,7 +89,7 @@ namespace Configurator.ViewModel
         {
             return new StrategyParameters(strategyParams.Select(p => new StrategyParameter(p.Name, p.Value)));
         }
-        private static double ExtractMaxVotes(IByMarketStrategyFactory factory)
+        private static int ExtractMaxVotes(IByMarketStrategyFactory factory)
         {
             ParamInfo piMinVotes = factory.GetParameterDescriptions().FirstOrDefault(d => d.Name == "MinVotes");
             if (piMinVotes == null || string.IsNullOrEmpty(piMinVotes.Description))
@@ -152,6 +153,10 @@ namespace Configurator.ViewModel
             if (!Enum.IsDefined(typeof(MarketFilterTargetState), intVal))
                 throw new Exception("Unknown TargetState value " + state);
             return (MarketFilterTargetState)intVal;
+        }
+        public static bool IsAdditionalTimeFrame(this string paramName)
+        {
+            return paramName.StartsWith("Timeframe", StringComparison.OrdinalIgnoreCase);
         }
 
 

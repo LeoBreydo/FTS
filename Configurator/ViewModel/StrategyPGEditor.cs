@@ -118,15 +118,17 @@ namespace Configurator.ViewModel
             Properties.Add(new PropertySpec("StrategyID", typeof(int?), CAT_MAIN) { ReadOnly = true });
             Properties.Add(new PropertySpec("StrategyName", typeof(string), CAT_MAIN));
 
-            _sgd = _info.SGDescription;
-            if (_sgd.ContainsTradingZones)
-                Properties.Add(new PropertySpec(" IgnoreTradingZones", typeof(bool), CAT_SIGNALGENERATOR_PARAMS));
-            foreach (StrategyParameter par in _info.Cfg.StrategyParameters.Parameters)
+            _sgd = _info.GetDescription();
+            if (_sgd != null)
             {
-                Properties.Add(new PropertySpec(
-                    par.Name, _sgd.GetParamType(par.Name), CAT_SIGNALGENERATOR_PARAMS,
-                    _sgd.GetParamDescription(par.Name)));
-
+                if (_sgd.ContainsTradingZones)
+                    Properties.Add(new PropertySpec(" IgnoreTradingZones", typeof(bool), CAT_SIGNALGENERATOR_PARAMS));
+                foreach (StrategyParameter par in _info.Cfg.StrategyParameters.Parameters)
+                {
+                    Properties.Add(new PropertySpec(
+                        par.Name, _sgd.GetParamType(par.Name), CAT_SIGNALGENERATOR_PARAMS,
+                        _sgd.GetParamDescription(par.Name)));
+                }
             }
 
             Properties.Add(new PropertySpec(" Use", typeof(StopLossPositionGuardTypes), CAT_GUARD_SL, "Use StopLoss Guard"));
@@ -260,13 +262,13 @@ Restriction is not used if maxBarsToWaitForOppositeSignal is zero"));
                     switch (e.Property.Name)
                     {
                         case "StrategyName":
-                            e.Value = _info.Name;
+                            e.Value = _info.StrategyName;
                             break;
                         case " Exchange":
                             e.Value = _info.Exchange;
                             break;
                         case " Market":
-                            e.Value = _info.MarketName;
+                            e.Value = _info.Market;
                             break;
                         case " TimeFrame":
                             e.Value = _info.TimeFrame;
@@ -367,7 +369,7 @@ Restriction is not used if maxBarsToWaitForOppositeSignal is zero"));
                             }
                             else if (!string.IsNullOrEmpty(strValue))
                             {
-                                if (!IndicatorsVerificator.CanCreateIndicator(_info.Cfg.Timeframe, strValue))
+                                if (!IndicatorsVerificator.IsValidIndicatorExpression(_info.Cfg.Timeframe, strValue))
                                     throw new Exception("Invalid indicator expression");
                             }
                             _dynGuard.StopGuardLongExpression = strValue;
@@ -384,7 +386,7 @@ Restriction is not used if maxBarsToWaitForOppositeSignal is zero"));
                             }
                             else if (!string.IsNullOrEmpty(strValue))
                             {
-                                if (!IndicatorsVerificator.CanCreateIndicator(_info.Cfg.Timeframe, strValue))
+                                if (!IndicatorsVerificator.IsValidIndicatorExpression(_info.Cfg.Timeframe, strValue))
                                     throw new Exception("Invalid indicator expression");
                             }
                             _dynGuard.StopGuardShortExpression = strValue;
@@ -411,7 +413,7 @@ Restriction is not used if maxBarsToWaitForOppositeSignal is zero"));
                             }
                             else if (!string.IsNullOrEmpty(strValue))
                             {
-                                if (!IndicatorsVerificator.CanCreateIndicator(_info.Cfg.Timeframe, strValue))
+                                if (!IndicatorsVerificator.IsValidIndicatorExpression(_info.Cfg.Timeframe, strValue))
                                     throw new Exception("Invalid indicator expression");
                             }
                             _dynGuard.TargetGuardLongExpression = strValue;
@@ -428,7 +430,7 @@ Restriction is not used if maxBarsToWaitForOppositeSignal is zero"));
                             }
                             else if (!string.IsNullOrEmpty(strValue))
                             {
-                                if (!IndicatorsVerificator.CanCreateIndicator(_info.Cfg.Timeframe, strValue))
+                                if (!IndicatorsVerificator.IsValidIndicatorExpression(_info.Cfg.Timeframe, strValue))
                                     throw new Exception("Invalid indicator expression");
                             }
                             _dynGuard.TargetGuardShortExpression = strValue;
@@ -449,7 +451,7 @@ Restriction is not used if maxBarsToWaitForOppositeSignal is zero"));
                             _propertyGrid.Refresh();
                             break;
                         case "StrategyName":
-                            _info.Name= (string)e.Value;
+                            _info.StrategyName= (string)e.Value;
                             break;
                             
                         case "MaxBarsToWaitForOppositeSignal":

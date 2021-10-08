@@ -3,117 +3,123 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Xml.Serialization;
+using Configurator.ViewModel;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
 using TimeZoneConverter;
 
 namespace Configurator
 {
-#if cut
 
-    public class GeneralSettings
+    public enum ScheduledIntervalState
     {
-        #region main settings
-
-        public readonly int DecisionComputationFrequency = 60;
-        /// <summary>
-        /// Update the cofiguration info each N seconds
-        /// </summary>
-        public readonly int RefreshStateFrequency = 3; // Keep ALIVE!
-        /// <summary>
-        /// CloseAll timeout when TradingService is shutting down in seconds
-        /// </summary>
-        public int CloseAllTimeout = 30;  // Keep ALIVE!
-
-        #endregion
-        #region order execution settings
-        /// <summary>
-        /// The maximum number of attempts to send the order to the same broker
-        /// </summary>
-        public int MaxAttemptsForEachBroker = 4;
-        // /// <summary>
-        // /// Total maximum number of attempts to send strategy order to any broker
-        // /// </summary>
-        // public int TotalMaxAttempts = 10;
-        /// <summary>
-        /// The timeout of the order execution report from broker in seconds
-        /// </summary>
-        public readonly int ResponseTimeoutInSeconds = 12; //alive
-        /// <summary>
-        /// To post the TooLongExecutionWarning message every N seconds of the order execution
-        /// </summary>
-        public readonly int PostFrequencyFor_WarningTooLongExecution = 15;
-        /// <summary>
-        /// Сonsider the quotation received from the broker obsolete after N seconds
-        /// </summary>
-        public readonly int VirtualBooksDataRelevanceInSeconds = 60;
-
-        /// <summary>
-        /// To stop provider if specified number of order execution violations detected during a day (invalid fills, order execution timeouts)
-        /// </summary>
-        public int ProviderPenaltiesThreshold = 3;
-        #endregion
-
-        public GeneralSettings() { }
-        public GeneralSettings(GeneralSettings from)
-        {
-            MaxAttemptsForEachBroker = from.MaxAttemptsForEachBroker;
-            ResponseTimeoutInSeconds = from.ResponseTimeoutInSeconds;
-            PostFrequencyFor_WarningTooLongExecution = from.PostFrequencyFor_WarningTooLongExecution;
-            VirtualBooksDataRelevanceInSeconds = from.VirtualBooksDataRelevanceInSeconds;
-            ProviderPenaltiesThreshold = from.ProviderPenaltiesThreshold;
-            DecisionComputationFrequency = from.DecisionComputationFrequency;
-            RefreshStateFrequency = from.RefreshStateFrequency;
-            CloseAllTimeout = from.CloseAllTimeout;
-        }
-        public string Verify()
-        {
-            if (MaxAttemptsForEachBroker <= 0) return "MaxAttemptsForEachBroker must be >0";
-            if (ResponseTimeoutInSeconds <= 0) return "ResponseTimeoutInSeconds must be >0";
-            if (PostFrequencyFor_WarningTooLongExecution <= 0) return "WarningTooLongExecutionEachSeconds must be >0";
-            if (VirtualBooksDataRelevanceInSeconds <= 0) return "VirtualBooksDataRelevanceInSeconds must be >0";
-            if (ProviderPenaltiesThreshold <= 0) return "ProviderPenaltiesThreshold must be >0";
-
-            string err;
-            if (null != (err = ValidateDecisionComputationFrequency(DecisionComputationFrequency)))
-                return err;
-
-            if (RefreshStateFrequency <= 0) return "UpdateStatePeriodicity must be >0";
-            if (CloseAllTimeout <= 0) return "ShutdownStrategiesTimeout must be >0";
-
-            return null;
-        }
-
-        public static string ValidateDecisionComputationFrequency(int decisionComputationFrequency)
-        {
-            if (decisionComputationFrequency <= 0 ||
-                decisionComputationFrequency > 60 ||
-                60 % decisionComputationFrequency != 0)
-                return
-                    "Invalid DecisionComputationFrequency value (set the value from the next values list: 1,2,3,4,5,6,10,12,15,20,30,60)";
-            return null;
-        }
-        public bool IsValid()
-        {
-            return Verify() == null;
-        }
+        NotStarted,
+        SoftStopping,
+        Stopped,
+        Finished
     }
-#endif
     public class ScheduledIntervalDescription
     {
+        public int Id { get; set; }
+        public string Info { get; set; }
         public string EnterTimeZoneName { get; set; }
         public string ExitTimeZoneName { get; set; }
         public DateTime? SoftStopTime { get; set; }
         public DateTime HardStopTime { get; set; }
         public DateTime NoRestrictionTime { get; set; }
 
+        public DateTime? SoftStopUtc { get; set; }
+        public DateTime HardStopUtc { get; set; }
+        public DateTime NoRestrictionUtc { get; set; }
+        public DateTime StartUtc => SoftStopUtc ?? HardStopUtc;
+
         public ScheduledIntervalDescription()
         {
+            Id = -1;
             EnterTimeZoneName = null;
             ExitTimeZoneName = null;
             SoftStopTime = null;
             HardStopTime = DateTime.MinValue;
             NoRestrictionTime = DateTime.MinValue;
+        }
+
+        public bool EqualsTo(ScheduledIntervalDescription other)
+        {
+            return Id == other.Id &&
+                   EnterTimeZoneName == other.EnterTimeZoneName &&
+                   ExitTimeZoneName == other.ExitTimeZoneName &&
+                   SoftStopTime == other.SoftStopTime &&
+                   HardStopTime == other.HardStopTime &&
+                   NoRestrictionTime == other.NoRestrictionTime;
+        }
+
+        public void AssignFrom(ScheduledIntervalDescription other)
+        {
+            Id = other.Id;
+            EnterTimeZoneName = other.EnterTimeZoneName;
+            ExitTimeZoneName = other.ExitTimeZoneName;
+            SoftStopTime = other.SoftStopTime;
+            HardStopTime = other.HardStopTime;
+            NoRestrictionTime = other.NoRestrictionTime;
+
+            SoftStopUtc = other.SoftStopUtc;
+            HardStopUtc = other.HardStopUtc;
+            NoRestrictionUtc = other.NoRestrictionUtc;
+
+            Info = other.Info;
+        }
+
+        public string VerifyAndUpdateUtc(int timeStepInMinutes)
+        {
+            if (timeStepInMinutes < 1 || timeStepInMinutes > 30)
+                return "Invalid timeStepInMinutes, value must be in range [1..30]: " + timeStepInMinutes;
+
+            if (Id < 0) return "id is not valid";
+            if (HardStopTime == DateTime.MinValue) return "HardStopTime is not defined";
+            if (NoRestrictionTime == DateTime.MinValue) return "NoRestrictionTime is not defined";
+
+            // try to find TimeZones
+            if (string.IsNullOrEmpty(EnterTimeZoneName)) return "Name of EnterTimeZone is undefined";
+            if (string.IsNullOrEmpty(ExitTimeZoneName)) return "Name of ExitTimeZone is undefined";
+            var enterTzi = TZConvert.GetTimeZoneInfo(EnterTimeZoneName);
+            if (enterTzi == null) return "EnterTimeZone info not found";
+            var exitTzi = TZConvert.GetTimeZoneInfo(ExitTimeZoneName);
+            if (exitTzi == null) return "ExitTimeZone info not found";
+
+            // convert to utc and round to SchedulerTimeStepInMinutes
+
+            HardStopUtc = HardStopTime.TimeToUtc(EnterTimeZoneName);//
+            NoRestrictionUtc = NoRestrictionTime.TimeToUtc(ExitTimeZoneName);//
+            if (HardStopUtc>=NoRestrictionUtc)
+                return "HardStopTime must precede NoRestrictionTime";
+
+            HardStopUtc= HardStopUtc.RoundDateTime(timeStepInMinutes, true);
+            NoRestrictionUtc= NoRestrictionUtc.RoundDateTime(timeStepInMinutes, false);
+
+            DateTime? softStopUtc=null;
+            if (SoftStopTime != null)
+            {
+                if (SoftStopTime.Value >= HardStopTime)
+                    return "SoftStopTime must precede HardStopTime";
+
+                softStopUtc =
+                    SoftStopTime.Value.TimeToUtc(EnterTimeZoneName).RoundDateTime(timeStepInMinutes, true);
+
+                if (softStopUtc == HardStopUtc)
+                    softStopUtc = null;
+            }
+            SoftStopUtc = softStopUtc;
+
+            return null;
+        }
+
+        public ScheduledIntervalState GetState(DateTime utcNow)
+        {
+            if (utcNow < StartUtc) return ScheduledIntervalState.NotStarted;
+            if (utcNow > NoRestrictionUtc) return ScheduledIntervalState.Finished;
+            if (SoftStopUtc!=null && utcNow<HardStopUtc)
+                return ScheduledIntervalState.SoftStopping;
+            return ScheduledIntervalState.Stopped;
         }
     }
 
@@ -148,80 +154,17 @@ namespace Configurator
         public int SchedulerTimeStepInMinutes = 5;
         public List<ScheduledInterval> ScheduledIntervals { get; set; } = new List<ScheduledInterval>();
 
-        public string AddScheduledInterval(ScheduledIntervalDescription sid, int id)
+
+        public string AddScheduledInterval(ScheduledIntervalDescription sid)
         {
-            DateTime RoundedDateTime(DateTime dt, bool down)
-            {
-                var n = dt.Minute;
-                var q = n / SchedulerTimeStepInMinutes;
-                return down
-                    ? dt.AddMinutes(SchedulerTimeStepInMinutes * q - n)
-                    : dt.AddMinutes(SchedulerTimeStepInMinutes * (q + 1) - n);
-            }
+            var err = sid.VerifyAndUpdateUtc(SchedulerTimeStepInMinutes);
+            if (err != null) return err;
 
-
-            if (SchedulerTimeStepInMinutes < 1 || SchedulerTimeStepInMinutes > 30)
-                return "SchedulerTimeStepInMinutes is not valid (must be integer and in [1;30] range)";
-            if (id < 0) return "id is not valid";
-            if (sid.HardStopTime == DateTime.MinValue) return "HardStopTime is not defined";
-            if (sid.NoRestrictionTime == DateTime.MinValue) return "NoRestrictionTime is not defined";
-
-            // try to find TimeZones
-            if (string.IsNullOrEmpty(sid.EnterTimeZoneName)) return "Name of EnterTimeZone is undefined";
-            if (string.IsNullOrEmpty(sid.ExitTimeZoneName)) return "Name of ExitTimeZone is undefined";
-            var enterTzi = TZConvert.GetTimeZoneInfo(sid.EnterTimeZoneName);
-            if (enterTzi == null) return "EnterTimeZone info not found";
-            var exitTzi = TZConvert.GetTimeZoneInfo(sid.ExitTimeZoneName);
-            if (exitTzi == null) return "ExitTimeZone info not found";
-
-            // convert to utc and round to SchedulerTimeStepInMinutes
-            DateTime? utcSoftStopTime = null;
-            if (sid.SoftStopTime != null)
-                utcSoftStopTime = RoundedDateTime( // round down
-                    TimeZoneInfo.ConvertTimeToUtc(
-                        DateTime.SpecifyKind(sid.SoftStopTime.Value, DateTimeKind.Unspecified), enterTzi), true);
-            var utcHardStopTime = RoundedDateTime( // round down
-                TimeZoneInfo.ConvertTimeToUtc(
-                    DateTime.SpecifyKind(sid.HardStopTime, DateTimeKind.Unspecified), enterTzi), true);
-            var utcNoRestrictionTime = RoundedDateTime( // round up
-                TimeZoneInfo.ConvertTimeToUtc(
-                    DateTime.SpecifyKind(sid.NoRestrictionTime, DateTimeKind.Unspecified), exitTzi), false);
-
-            // verify invariants
-            if (utcSoftStopTime != null && utcSoftStopTime >= utcHardStopTime)
-                return "SoftStopTime must precede HardStopTime";
-            if (utcHardStopTime >= utcNoRestrictionTime)
-                return "HardStopTime must precede NoRestrictionTime";
-
-            ScheduledIntervals.Add(new ScheduledInterval(id, utcSoftStopTime, utcHardStopTime, utcNoRestrictionTime));
+            ScheduledIntervals.Add(
+                new ScheduledInterval(sid.Id, sid.SoftStopUtc, sid.HardStopUtc, sid.NoRestrictionUtc));
             return null;
         }
 
-        public string Verify()
-        {
-            var IDs = new List<int>();
-            var strategyNames = new List<string>();
-            var currencies = new List<string>();
-            var exchanges = new List<string>();
-            var mktExs = new List<string>();
-
-            if (Id < 0) return "TradingConfiguration.Id must be non-negative";
-            IDs.Add(Id);
-            //if (GeneralSettings == null) return "General Settings is not specified";
-            //var error = GeneralSettings.Verify();
-            //if (error != null) return "Invalid General Settings: " + error;
-            if (Exchanges == null || Exchanges.Count == 0) return "Exchanges are undefined";
-            if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
-
-            var idx = 0;
-            foreach (var errString in Exchanges.Select(cgc => cgc.Verify(IDs, strategyNames, exchanges, currencies, mktExs)))
-            {
-                if (errString != null) return $"Exchange configuration at index {idx} : {errString}";
-                ++idx;
-            }
-
-            return null;
-        }
 #if tmp
         public List<(StrategyConfiguration, List<string>)> GetAdditionalInstruments()
         {
@@ -284,15 +227,19 @@ namespace Configurator
         public string ExchangeName;// { get; set; } = "UNK";
         public int MaxErrorsPerDay = 0;
         public List<MarketConfiguration> Markets { get; set; } = new List<MarketConfiguration>();
-        public string Verify(List<int> IDs, List<string> strategyNames, List<string> exchanges, List<string> currencies, List<string> mktExs)
+
+        public string VerifyMe(List<int> IDs, List<string> exchanges, List<string> currencies)
         {
             if (Id < 0) return "Id must be non-negative";
             if (IDs.Contains(Id)) return $"Id duplication detected - {Id}";
             IDs.Add(Id);
             if (string.IsNullOrWhiteSpace(Currency) || Currency.Length != 3 || Currency == "UNK")
                 return "Currency is undefined";
-            if (currencies.Contains(Currency)) return $"Currency duplication detected - {Currency}";
-            currencies.Add(Currency);
+
+            //if (currencies.Contains(Currency)) return $"Currency duplication detected - {Currency}";
+            //currencies.Add(Currency);
+            if (!currencies.Contains(Currency))
+                currencies.Add(Currency);
 
             if (string.IsNullOrWhiteSpace(ExchangeName) || Currency == "UNK")
                 return "Name of exchange is undefined";
@@ -301,14 +248,19 @@ namespace Configurator
 
             if (MaxErrorsPerDay < 0) return "MaxErrorsPerDay must be non-negative";
 
+            return null;
+        }
+        public string Verify(List<int> IDs, List<string> strategyNames, List<string> exchanges, List<string> currencies, List<string> mktExs, IndicatorsVerificator indVerificator)
+        {
+            string err = VerifyMe(IDs,  exchanges, currencies);
+
             if (Markets == null || Markets.Count == 0) return "Markets are undefined";
             var idx = 0;
-            foreach (var errString in Markets.Select(market => market.Verify(IDs, strategyNames, mktExs)))
+            foreach (var errString in Markets.Select(market => market.Verify(IDs, strategyNames, mktExs, indVerificator)))
             {
                 if (errString != null) return $"Market configuration at index {idx} : {errString}";
                 ++idx;
             }
-
             return null;
         }
     }
@@ -325,7 +277,7 @@ namespace Configurator
         public int MaxNbrContracts = 0;
         public List<StrategyConfiguration> Strategies { get; set; } = new List<StrategyConfiguration>();
 
-        public string Verify(List<int> IDs, List<string> strategyNames, List<string> mktExs)
+        public string VerifyMe(List<int> IDs, List<string> mktExs)
         {
             if (Id < 0) return "Id must be non-negative";
             if (IDs.Contains(Id)) return $"Id duplication detected - {Id}";
@@ -345,8 +297,17 @@ namespace Configurator
             // it's true if a given market used just for indicator calculation.
             // So, condition 'Strategy.Count == 0' is removed.
             if (Strategies == null) return "Strategies are undefined";
+
+            return null;
+        }
+        public string Verify(List<int> IDs, List<string> strategyNames, List<string> mktExs, IndicatorsVerificator indVerificator)
+        {
+            var err = VerifyMe(IDs,  mktExs);
+            if (err != null) return err;
+
+            if (Strategies == null) return "Strategies are undefined";
             var idx = 0;
-            foreach (var errString in Strategies.Select(sc => sc.Verify(IDs, strategyNames)))
+            foreach (var errString in Strategies.Select(sc => sc.Verify(IDs, strategyNames,indVerificator,null))) // todo Last arg can not be null (SGDescription), that lead to constant error!!! 
             {
                 if (errString != null) return $"Strategy configuration at index {idx} : {errString}";
                 ++idx;
@@ -597,7 +558,151 @@ namespace Configurator
                 .ToList();
         }
 
-        public string Verify(List<int> IDs, List<string> strategyNames)
+        private string VerifyGuards()
+        {
+            if (UseTakeProfitGuard)
+            {
+                if (TakeProfitDelta <= 0)
+                    return "TakeProfitGuard, TakeProfitDelta is invalid";
+            }
+            switch (StopLossPositionGuardType)
+            {
+                case StopLossPositionGuardTypes.No:
+                    break;
+                case StopLossPositionGuardTypes.Fixed:
+                    if (FixedStopLossDelta <= 0)
+                        return "StopLossGuard, FixedStopLossDelta is invalid";
+                    break;
+                case StopLossPositionGuardTypes.Trailed:
+                    if (TrailedStopLossInitialDelta <= 0)
+                        return "StopLossGuard, TrailedStopLossInitialDelta is invalid";
+                    if (TrailingDelta <= 0)
+                        return "StopLossGuard, TrailingDelta is invalid";
+                    if (ActivationProfit <= 0)
+                        return "StopLossGuard, ActivationProfit is invalid";
+                    break;
+            }
+            return null;
+        }
+        private string VerifyDynamicGuard(IndicatorsVerificator indVerificator)
+        {
+            if (indVerificator == null) return null;
+
+            DynamicGuard dd = DynamicGuardDescription;
+            if (dd.TargetMode != DynamicGuardMode.NotUse)
+            {
+                if (string.IsNullOrEmpty(dd.TargetGuardLongExpression)) return "DynamicTargetGuardLongExpression is not specified";
+                var err = indVerificator.VerifyIndicator(Timeframe, dd.TargetGuardLongExpression);
+                if (err != null) return "DynamicTargetGuardLongExpression is invalid: " + err;
+
+                if (string.IsNullOrEmpty(dd.TargetGuardShortExpression)) return "DynamicTargetGuardShortExpression is not specified";
+                err = indVerificator.VerifyIndicator(Timeframe, dd.TargetGuardShortExpression);
+                if (err != null) return "DynamicTargetGuardShortExpression is invalid: " + err;
+            }
+            if (dd.StopMode != DynamicGuardMode.NotUse)
+            {
+                if (string.IsNullOrEmpty(dd.StopGuardLongExpression)) return "DynamicStopGuardLongExpression is not specified";
+                var err = indVerificator.VerifyIndicator(Timeframe, dd.StopGuardLongExpression);
+                if (err != null) return "DynamicStopGuardLongExpression is invalid: " + err;
+                 
+                if (string.IsNullOrEmpty(dd.StopGuardShortExpression)) return "DynamicStopGuardShortExpression is not specified";
+                err = indVerificator.VerifyIndicator(Timeframe, dd.StopGuardShortExpression);
+                if (err != null) return "DynamicStopGuardShortExpression is invalid: " + err;
+            }
+            return null;
+        }
+        public static string VerifyStrategyParameters(SignalGeneratorDescription descr, StrategyParameters sp)//, Func<string, bool> verifyAdditionalTimeFrame) //string modelID, 
+        {
+            if (sp == null || sp.Parameters == null) return "Strategy parameters are not specified";
+
+            foreach (var defParam in descr.DefaultParameters.Parameters)
+            {
+                if (!sp.Parameters.Exists(item => item.Name == defParam.Name))
+                    return string.Format("Strategy parameter {0} is not specified ", defParam.Name);
+            }
+            if (sp.Parameters.Count == 0) return null;
+
+            int maxBarsInPosition = 0;
+            bool flatPositionAllowed = true;
+            bool onlyAlteratedPositionsAllowed = false;
+            foreach (var par in sp.Parameters)
+            {
+                switch (par.Name)
+                {
+                    case "MaxBarsInPosition":
+                        if (!int.TryParse(par.Value, out maxBarsInPosition) || maxBarsInPosition < 0)
+                            return "MaxBarsInPosition must be>=0";
+                        break;
+                    case "FlatPositionAllowed":
+                        if (!ToBool(par.Value, out flatPositionAllowed))
+                            return "FlatPositionAllowed must have boolean value";
+                        break;
+                    case "OnlyAlteratedPositionsAllowed":
+                        if (!ToBool(par.Value, out onlyAlteratedPositionsAllowed))
+                            return "OnlyAlteratedPositionsAllowed must have boolean value";
+                        break;
+                    case "MinVotes":
+                        if (!int.TryParse(par.Value, out int minVotes) || minVotes < 0)
+                            return "Invalid MinVotes value, expected the positive integer value";
+                        if (descr.MaxVotes > 0 && minVotes > descr.MaxVotes)
+                            return "Invalid MinVotes, value must be <= " + descr.MaxVotes;
+                        break;
+                    case "Quorum": // by the way-  it is missed in Fx Configurator checking!!! and might be directly in TS
+                        if (!int.TryParse(par.Value, out int quorum) || quorum < 0)
+                            return "Invalid Quorum value, expected the positive integer value";
+                        if (descr.MaxVotes > 0 && quorum > descr.MaxVotes)
+                            return "Invalid Quorum, value must be <= " + descr.MaxVotes;
+                        break;
+                    default:
+                        if (par.Name.IsAdditionalTimeFrame())
+                        {
+                            return
+                                "Strategies with additional timeframes not supported in this version (strategy parameter {par.Name})";
+#if tmp
+                            if (string.IsNullOrWhiteSpace(par.Value))
+                                return string.Format("Value is not specified for signal generator parameter '{0}'", par.Name);
+                            if (verifyAdditionalTimeFrame != null && !verifyAdditionalTimeFrame(par.Value))
+                                return string.Format("Signal generator parameter '{0}' has invalid value '{1}'",
+                                    par.Name, par.Value);
+#endif
+                        }
+                        break;
+                }
+            }
+            return CheckParametersConsistency(maxBarsInPosition, flatPositionAllowed, onlyAlteratedPositionsAllowed);
+        }
+        private static bool ToBool(string str, out bool val)
+        {
+            if (string.Equals(str, "true", StringComparison.OrdinalIgnoreCase))
+            {
+                val = true;
+                return true;
+            }
+            if (string.Equals(str, "false", StringComparison.OrdinalIgnoreCase))
+            {
+                val = false;
+                return true;
+            }
+            val = false;
+            return false;
+        }
+        private static string CheckParametersConsistency(int maxBarsInPosition, bool flatPositionAllowed, bool onlyAlteratedPositionsAllowed)
+        {
+            if (maxBarsInPosition < 0) return "Invalid MaxBarsInPosition";
+            if (!flatPositionAllowed && maxBarsInPosition > 0)
+                return "FlatPositionAllowed must be true if the MaxBarsInPosition restriction is specified";
+
+            if (!flatPositionAllowed)
+            {
+                if (!onlyAlteratedPositionsAllowed)
+                    return "If FlatPositionAllowed is false then OnlyAlternatePositionAllowed must be set to true";
+            }
+
+            return null;
+        }
+
+
+        public string Verify(List<int> IDs, List<string> strategyNames, IndicatorsVerificator indVerificator,SignalGeneratorDescription sgd)
         {
             if (Id < 0) return "Id must be non-negative";
             if (IDs.Contains(Id)) return $"Id duplication detected - {Id}";
@@ -628,7 +733,20 @@ namespace Configurator
             //    return "SynchronizationMinute must be in [0;1439]";
             //if (HistorySizeToLoadInDays < 0) return "HistorySizeToLoadInDays must be non-negative";
 
-            return null;
+
+            if (sgd != null)
+            {
+                var err = VerifyStrategyParameters(sgd, StrategyParameters);
+                if (err != null) return err;
+                foreach (string expr in sgd.IndicatorExpressions)
+                {
+                    err = indVerificator.VerifyIndicator(Timeframe, expr);
+                    if (err != null)
+                        return $"Cannot create indicator used by strategy\nExpression:{expr}\nError:{err}";
+                }
+            }
+            return VerifyGuards()?? VerifyDynamicGuard(indVerificator);
         }
+
     }
 }

@@ -52,7 +52,7 @@ namespace Configurator.ViewModel
         }
         private static bool IsNormalCcy(string currency)
         {
-            if (string.Equals(currency, "UNK", StringComparison.OrdinalIgnoreCase)) return false; // !! if we really will have the such currency, then change the def values used in CfgDescription in project CoreTypes
+            if (string.Equals(currency, "UNK", StringComparison.OrdinalIgnoreCase)) return false;
 
             return currency.Length == 3 && currency.All(char.IsLetter);
         }

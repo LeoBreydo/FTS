@@ -16,7 +16,7 @@ namespace Configurator
         /// <param name="FileName">filename to save to</param>
         /// <param name="Rethrow">defines behaviour when exception: false(by default)=do return false, true=do rethrow exception</param>
         /// <returns>true if save succeeded</returns>
-        public static bool Save(T item, string FileName, bool Rethrow = false)
+        public static string Save(T item, string FileName, bool Rethrow = false)
         {
             try
             {
@@ -29,13 +29,39 @@ namespace Configurator
                     serializer.Serialize(writer, item);
                 }
             }
-            catch
+            catch(Exception exception)
             {
                 if (Rethrow) throw;
-                return false;
+                return exception.Message;
             }
-            return true;
+            return null;
         }
+
+        public static string SaveToString(T item)
+        {
+            using (StringWriter textWriter = new StringWriter())
+            {
+                serializer.Serialize(textWriter, item);
+                return textWriter.ToString();
+            }
+       }
+
+        public static bool DiffersFromFile(T item, string fileName)
+        {
+            if (!File.Exists(fileName)) return true;
+            try
+            {
+                var str0=SaveToString(Serializer<T>.Open(fileName, true));
+                var str1 = SaveToString(item);
+                return str0 != str1;
+            }
+            catch
+            {
+                return true;
+            }
+
+        }
+
 
         /// <summary>
         /// restore xml-serialized data from file 

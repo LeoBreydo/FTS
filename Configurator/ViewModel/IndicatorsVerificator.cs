@@ -1,23 +1,17 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using Binosoft.TraderLib.Indicators;
 using Indicators.Common;
-using PluginsInterfaces;
-
-//using Primitives;
 
 namespace Configurator.ViewModel
 {
-    public static class IndicatorsVerificator
+    public class IndicatorsVerificator
     {
+        #region nested
         class DPVerificatorForSingleInstrument : IDataProvider
         {
             public const string INSTRUMENT = "INSTRUMENT";
-            private readonly bool _allowsRenkoBars;
-            public DPVerificatorForSingleInstrument(bool allowsRenkoBars)
-            {
-                _allowsRenkoBars = allowsRenkoBars;
-            }
             public bool ExistsInstrument(string instrumentName)
             {
                 return !string.IsNullOrEmpty(instrumentName) && string.Equals(instrumentName, INSTRUMENT, StringComparison.OrdinalIgnoreCase);
@@ -30,18 +24,7 @@ namespace Configurator.ViewModel
                     : null;
             }
 
-            public TimeFrameData GetAggregatedTimeFrame(string instrument, string timeframe)
-            {
-                if (!_allowsRenkoBars) return null;
-                BarFormingPolicy policy;
-                double barSize;
-                int gapSizeInMinutes, resetDay, resetMinute;
-                return string.Equals(instrument, INSTRUMENT, StringComparison.OrdinalIgnoreCase) &&
-                       timeframe.ParseRenkoTimeFrame(
-                           out policy, out barSize, out gapSizeInMinutes, out resetMinute, out resetDay)
-                    ? new TimeFrameData()
-                    : null;
-            }
+            public TimeFrameData GetAggregatedTimeFrame(string instrument, string timeframe) => null;
 
             public bool GetInstrumentConstant(string instrument, string constantName, out double value)
             {
@@ -56,11 +39,49 @@ namespace Configurator.ViewModel
             }
 
         }
+        #endregion
+
+        private readonly CommonIndicatorsContainer container;
+        public IndicatorsVerificator()
+        {
+            container = new CommonIndicatorsContainer(new DPVerificatorForSingleInstrument());
+        }
+        public string VerifyIndicator(string timeframe, string expression)
+        {
+            Indicator ir = container.GetIndicator(1, DPVerificatorForSingleInstrument.INSTRUMENT, timeframe, expression);
+            if (ir != null && ir.IsInited) return null;
+
+            if (!string.IsNullOrEmpty(ir?.InitError)) return ir.InitError;
+            return container.LastError;
+        }
+
+        public List<string> GetUsedIndicatorDlls()
+        {
+            var dlls = new List<string>();
+            foreach (var ind in container.EnumerateIndicators())
+            {
+                var func = ind.GetFunction();
+                if (func == null) continue;
+
+                string dll = func.GetType().Assembly.Location;
+                if (!dlls.Contains(dll))
+                    dlls.Add(dll);
+            }
+
+            dlls.RemoveAll(item => Path.GetFileName(item).ToLower() == "binosoft.traderlib.indicators.dll");
+            return dlls;
+        }
+
+        public static bool IsValidIndicatorExpression(string timeframe, string expression)
+        {
+            return new IndicatorsVerificator().VerifyIndicator(timeframe, expression) == null;
+        }
+#if notUsed
         public static string TryCreateIndicators(string timeframe, params string[] expressions)
         {
             var errors = new List<string>();
 
-            var container = new CommonIndicatorsContainer(new DPVerificatorForSingleInstrument(true));
+            var container = new CommonIndicatorsContainer(new DPVerificatorForSingleInstrument());
             foreach (string expr in expressions)
             {
                 Indicator ir = container.GetIndicator(1, DPVerificatorForSingleInstrument.INSTRUMENT, timeframe, expr);
@@ -70,16 +91,11 @@ namespace Configurator.ViewModel
             if (errors.Count == 0) return null;
             return "Can't create the following indicators:\n " + string.Join("\n ", errors);
         }
-        public static bool CanCreateIndicator(string timeframe, string expression)
-        {
-            if (string.IsNullOrEmpty(timeframe) || string.IsNullOrEmpty(expression)) return false;
-            return TryCreateIndicators(timeframe, expression) == null;
-        }
-        public static bool IsValidTimeFrame(string timeframe, bool allowsRenkoBars, out string normalizedTimeFrame)
+        public static bool IsValidTimeFrame(string timeframe, out string normalizedTimeFrame)
         {
             normalizedTimeFrame = null;
 
-            var container = new CommonIndicatorsContainer(new DPVerificatorForSingleInstrument(allowsRenkoBars));
+            var container = new CommonIndicatorsContainer(new DPVerificatorForSingleInstrument());
             foreach (string ohlc in new[] { "open", "high", "low", "close" })
             {
                 Indicator ir = container.GetIndicator(1, DPVerificatorForSingleInstrument.INSTRUMENT, timeframe, ohlc);
@@ -92,9 +108,9 @@ namespace Configurator.ViewModel
 
         public static bool VerifyAdditionalTimeFrame(string timeframe)
         {
-            string normalizedTimeFrame;
-            return IsValidTimeFrame(timeframe, true, out normalizedTimeFrame);
+            return IsValidTimeFrame(timeframe, out string _);
         }
+#endif
     }
     public static class TimeGridHelper
     {
