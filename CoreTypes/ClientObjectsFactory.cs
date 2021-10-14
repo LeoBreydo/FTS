@@ -1,12 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
-using WebClientObjects;
+using System.Linq;
+using LocalCommunicationLib;
 
 namespace CoreTypes
 {
     public static class ClientObjectsFactory
     {
-        public static ServerStateObject ComposeServerStateObject(this TradingServiceState serviceState)
+        public static ServerStateObject ComposePayload(this TradingServiceState serviceState)
         {
             return new ServerStateObject
             {
@@ -14,27 +15,50 @@ namespace CoreTypes
                 Details = serviceState.GetExchangeDetails()
             };
         }
+
         private static TradingServicesSummary GetSummary(this TradingServiceState serviceState)
         {
             var summary = new TradingServicesSummary
             {
                 Id = serviceState.Id,
                 IsConnected = serviceState.IsConnected,
-                RestrictionDetails = serviceState.Restrictions,
-                CurrentRestriction = serviceState.CurrentRestriction,
-                MessagesToShow = serviceState.MessagesToShow
+                DayErrorNbr = serviceState.DayErrorNbr,
+                RestrictionDetails = serviceState.CurrentRestrictions,
+                MessagesToShow = serviceState.MessagesToShow.Select(m=>new Message{Tag = m.Item1, Body = m.Item2}).ToList()
             };
             foreach (var cgs in serviceState.CurrencyGroupStates)
-            { 
+            {
                 summary.CGSummaries.Add(cgs.GetCGS());
                 foreach (var es in cgs.ExchangeStates) summary.ExSummaries.Add(es.GetES(cgs.Currency));
             }
             return summary;
         }
-
-        private static Dictionary<int, ExchangeDetails> GetExchangeDetails(this TradingServiceState serviceState)
+        private static CurrencyGroupSummary GetCGS(this CurrencyGroupState cgs)
         {
-            Dictionary<int, ExchangeDetails> ret = new();
+            return new CurrencyGroupSummary
+            {
+                Currency = cgs.Currency,
+                UPL = cgs.UnrealizedResult,
+                RPL = cgs.RealizedResult
+            };
+        }
+        private static ExchangeSummary GetES(this ExchangeState es, string currency)
+        {
+            return new ExchangeSummary
+            {
+                Id = es.Id,
+                Name = es.Exchange,
+                Currency = currency,
+                UPL = es.UnrealizedResult,
+                RPL = es.RealizedResult,
+                RestrictionDetails = es.CurrentRestrictions
+            };
+        }
+
+
+        private static Dictionary<string, ExchangeDetails> GetExchangeDetails(this TradingServiceState serviceState)
+        {
+            Dictionary<string, ExchangeDetails> ret = new();
             foreach (var cgs in serviceState.CurrencyGroupStates)
             {
                 var currency = cgs.Currency;
@@ -46,36 +70,12 @@ namespace CoreTypes
                         ed.MktOrStrategies.Add(ms.GetMOSD());
                         foreach (var ss in ms.StrategyStates) ed.MktOrStrategies.Add(ss.GetMOSD());
                     }
-                    ret.Add(ed.Id, ed);
+                    ret.Add(ed.Name, ed);
                 }
             }
 
             return ret;
         }
-
-        private static CurrencyGroupSummary GetCGS(this CurrencyGroupState cgs)
-        {
-            return new CurrencyGroupSummary
-            {
-                Currency = cgs.Currency,
-                UPL = cgs.UnrealizedResult,
-                RPL = cgs.RealizedResult
-            };
-        }
-
-        private static ExchangeSummary GetES(this ExchangeState es, string currency)
-        {
-            return new ExchangeSummary
-            {
-                Id = es.Id,
-                Name = es.Exchange,
-                Currency = currency,
-                UPL = es.UnrealizedResult,
-                RPL = es.RealizedResult,
-                CurrentRestriction = es.CurrentRestriction,
-            };
-        }
-
         private static ExchangeDetails GetED(this ExchangeState es, string currency, bool isConnected,
             List<Tuple<string, string>> msgToShow)
         {
@@ -87,14 +87,13 @@ namespace CoreTypes
                 IsConnected = isConnected,
                 UPL = es.UnrealizedResult,
                 RPL = es.RealizedResult,
-                Restrictions = es.Restrictions,
-                Info = $"Restriction - {es.CurrentRestriction}; Act. mkts. - {es.ActiveMarketsNbr}; " +
-                       $"Act. str. - {es.ActiveStrategiesNbr}; Day err. nbr. - {es.DayErrorNbr}",
-                MessagesToShow = msgToShow,
+                RestrictionDetails = es.CurrentRestrictions,
+                Info = $"Act. mkts. - {es.ActiveMarketsNbr}; Act. str. - {es.ActiveStrategiesNbr}; ",
+                MessagesToShow = msgToShow.Select(m => new Message { Tag = m.Item1, Body = m.Item2 }).ToList(),
+                DayErrorNbr = es.DayErrorNbr,
                 MktOrStrategies = new()
             };
         }
-
         private static MarketOrStrategyDetails GetMOSD(this MarketState ms)
         {
             return new MarketOrStrategyDetails
@@ -105,13 +104,11 @@ namespace CoreTypes
                 UPL = ms.UnrealizedResult,
                 RPL = ms.RealizedResult,
                 Position = ms.LongSize + ms.ShortSize,
-                Restrictions = ms.Restrictions,
+                RestrictionDetails = ms.CurrentRestrictions,
                 SessionResult = ms.SessionResult,
-                Info =
-                    $"Restriction - {ms.CurrentRestriction}; Act. str. - {ms.ActiveStrategiesNbr}; Day err. nbr. - {ms.DayErrorNbr}"
+                Info = $"Act. str. - {ms.ActiveStrategiesNbr}; Day err. nbr. - {ms.DayErrorNbr}"
             };
         }
-
         private static MarketOrStrategyDetails GetMOSD(this StrategyState ss)
         {
             return new MarketOrStrategyDetails
@@ -122,10 +119,25 @@ namespace CoreTypes
                 UPL = ss.UnrealizedResult,
                 RPL = ss.RealizedResult,
                 Position = ss.Size,
-                Restrictions = ss.Restrictions,
+                RestrictionDetails = ss.CurrentRestrictions,
                 SessionResult = ss.SessionResult,
-                Info = $"Restriction - {ss.CurrentRestriction}",
+                Info = ""
             };
         }
+
+
+
+
+        // old
+
+
+
+        
+
+        
+
+        
+
+        
     }
 }

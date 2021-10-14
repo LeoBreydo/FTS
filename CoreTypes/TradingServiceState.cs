@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using LocalCommunicationLib;
 
 namespace CoreTypes
 {
@@ -9,8 +10,7 @@ namespace CoreTypes
         public bool IsConnected;
         public List<Tuple<string, string>> MessagesToShow;
         public int DayErrorNbr;
-        public string Restrictions;
-        public string CurrentRestriction;
+        public Restrictions CurrentRestrictions;
         public List<CurrencyGroupState> CurrencyGroupStates=new ();
 
         public TradingServiceState(List<Tuple<string, string>> messagesToShow, bool isConnected,
@@ -20,8 +20,7 @@ namespace CoreTypes
             IsConnected = isConnected;
             MessagesToShow = messagesToShow;
             DayErrorNbr = ts.ErrorTracker.ValueForCurrentPeriod;
-            Restrictions = ts.RestrictionManager.GetRestrictions();
-            CurrentRestriction = ts.RestrictionManager.GetCurrentRestriction().AsString();
+            CurrentRestrictions = ts.RestrictionManager.GetRestrictionsAsObject();
             foreach (var (key, value) in ts.Positions)
                 CurrencyGroupStates.Add(new CurrencyGroupState(key, value));
         }
@@ -49,8 +48,7 @@ namespace CoreTypes
         public string Exchange;
         public decimal UnrealizedResult;
         public decimal RealizedResult;
-        public string Restrictions;
-        public string CurrentRestriction;
+        public Restrictions CurrentRestrictions;
         public int ActiveMarketsNbr;
         public int ActiveStrategiesNbr;
         public List<MarketState> MarketStates = new ();
@@ -62,14 +60,13 @@ namespace CoreTypes
             Exchange = et.Exchange;
             UnrealizedResult = et.Position.UnrealizedResult;
             RealizedResult = et.Position.RealizedResult;
-            Restrictions = et.RestrictionsManager.GetRestrictions();
-            CurrentRestriction = et.RestrictionsManager.GetCurrentRestriction().AsString();
+            CurrentRestrictions = et.RestrictionsManager.GetRestrictionsAsObject();
             DayErrorNbr = et.ErrorTracker.ValueForCurrentPeriod;
 
             foreach (var mt in et.Markets.Values)
             {
                 var ms = new MarketState(mt);
-                if (ms.CurrentRestriction == "NoRestrictions")
+                if (ms.IsActive)
                 {
                     ++ActiveMarketsNbr;
                     ActiveStrategiesNbr += ms.ActiveStrategiesNbr;
@@ -89,11 +86,11 @@ namespace CoreTypes
         public int LongSize;
         public int ShortSize;
         public decimal SessionResult;
-        public string Restrictions;
-        public string CurrentRestriction;
+        public Restrictions CurrentRestrictions;
         public List<StrategyState> StrategyStates = new();
         public int DayErrorNbr;
         public int ActiveStrategiesNbr;
+        public bool IsActive;
 
         public MarketState(MarketTrader mt)
         {
@@ -105,13 +102,13 @@ namespace CoreTypes
             LongSize = mt.Position.LongSize;
             ShortSize = mt.Position.ShortSize;
             SessionResult = mt.Position.LossManager.ValueForCurrentPeriod;
-            Restrictions = mt.RestrictionsManager.GetRestrictions();
-            CurrentRestriction = mt.RestrictionsManager.GetCurrentRestriction().AsString();
+            CurrentRestrictions = mt.RestrictionsManager.GetRestrictionsAsObject();
             DayErrorNbr = mt.ErrorTracker.ValueForCurrentPeriod;
+            IsActive = mt.RestrictionsManager.GetCurrentRestriction() == TradingRestriction.NoRestrictions;
             foreach (var st in mt.StrategyMap.Values)
             {
                 var ss = new StrategyState(st);
-                if (ss.CurrentRestriction == "NoRestrictions") ++ActiveStrategiesNbr;
+                if (ss.IsActive) ++ActiveStrategiesNbr;
                 StrategyStates.Add(ss);
             }
         }
@@ -125,8 +122,8 @@ namespace CoreTypes
         public decimal RealizedResult;
         public int Size;
         public decimal SessionResult;
-        public string Restrictions;
-        public string CurrentRestriction;
+        public Restrictions CurrentRestrictions;
+        public bool IsActive;
 
         public StrategyState(StrategyTrader st)
         {
@@ -136,8 +133,8 @@ namespace CoreTypes
             RealizedResult = st.Position.RealizedResult;
             Size = st.Position.Size;
             SessionResult = st.Position.LossManager.ValueForCurrentPeriod;
-            Restrictions = st.RestrictionsManager.GetRestrictions();
-            CurrentRestriction = st.RestrictionsManager.GetCurrentRestriction().AsString();
+            CurrentRestrictions = st.RestrictionsManager.GetRestrictionsAsObject();
+            IsActive = st.RestrictionsManager.GetCurrentRestriction() == TradingRestriction.NoRestrictions;
         }
     }
 }

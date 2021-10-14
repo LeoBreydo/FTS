@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using LocalCommunicationLib;
 
 namespace CoreTypes
 {
@@ -54,6 +56,46 @@ namespace CoreTypes
                 : $"{tr.AsString()} by {((CommandSource) i).AsString()}")
                 .Where(s=>s != string.Empty)
                 .ToList());
+        }
+       
+        public Restrictions GetRestrictionsAsObject()
+        {
+            var ret = new Restrictions();
+            var i = 0;
+            foreach (var tr in _restrictions)
+            {
+                var v = (int) tr;
+                switch (i)
+                {
+                    case 0:
+                        ret.userStyle = v;
+                        break;
+                    case 1:
+                        ret.schedStyle = v;
+                        break;
+                    case 2:
+                        ret.lossStyle = v;
+                        break;
+                    case 3:
+                        ret.parStyle = v;
+                        break;
+                    case 4:
+                        ret.contrStyle = v;
+                        break;
+                    case 5:
+                        ret.sessStyle = v;
+                        break;
+                    case 6:
+                        ret.errStyle = v;
+                        break;
+                    default:
+                        ret.mktStyle = v;
+                        break;
+                }
+
+                ++i;
+            }
+            return ret;
         }
 
         public TradingRestriction GetRestriction(CommandSource cs)
@@ -126,9 +168,6 @@ namespace CoreTypes
 
         public void SetCriticalLossRestriction(TradingRestriction r) =>
             SetRestriction(r, CommandSource.CriticalLoss);
-
-        public void SetErrorRestriction(TradingRestriction r) =>
-            SetRestriction(r, CommandSource.Error);
 
         public void SetOutOfMarketRestriction(TradingRestriction r) =>
             SetRestriction(r, CommandSource.OutOfMarket);
