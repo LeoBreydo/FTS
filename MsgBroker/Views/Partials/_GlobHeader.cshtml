@@ -1,0 +1,30 @@
+﻿<div class="header">
+    <div class="header__controls" id="grapp">
+        <div>GLOBAL&nbsp;: </div>
+        <button class="button" v-on:click="javascript:GlobalApp.Message(Id, 0, 0)">Start</button>
+        <button class="button" v-on:click="javascript:GlobalApp.Message(Id, 1, 0)">SoftStop</button>
+        <button class="button" v-on:click="javascript:GlobalApp.Message(Id, 2, 0)">HardStop</button>
+        <div class="restrictions">
+            <div>&nbsp;&nbsp;Day&nbsp;Error&nbsp;Nbr&nbsp;:&nbsp;</div>
+            <div>{{error_nbr}}&nbsp;&nbsp;</div>
+            <div class="restriction__label">Current&nbsp;restrictions&nbsp;:</div>
+            <div class="restriction__cell" :style="userStyle">User</div>
+            <div class="restriction__cell" :style="schedStyle">Shed</div>
+            <div class="restriction__cell" :style="lossStyle">Loss</div>
+            <div class="restriction__cell" :style="parStyle">Parent</div>
+            <div class="restriction__cell" :style="contrStyle">Contract</div>
+            <div class="restriction__cell" :style="sessStyle">Session</div>
+            <div class="restriction__cell" :style="errStyle">Errors</div>
+            <div class="restriction__cell" :style="mktStyle">Market</div>
+            <div class="restriction__legend">
+                <div>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                <div class="restriction__box" style="background-color: green;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                <div class="restriction__label">-&nbsp;NoRestrictions</div>
+                <div class="restriction__box" style="background-color: red;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                <div class="restriction__label">-&nbsp;SoftStop</div>
+                <div class="restriction__box" style="background-color: black;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+                <div class="restriction__label">-&nbsp;HardStop</div>
+            </div>
+        </div>
+    </div>
+</div>

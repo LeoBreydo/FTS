@@ -1,0 +1,163 @@
+﻿
+*,
+*:after,
+*:before {
+    -webkit-box-sizing: border-box;
+    -moz-box-sizing: border-box;
+    box-sizing: border-box;
+}
+
+html, body {
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+
+.container {
+    height: 100vh;
+    width: 100vw;
+    padding: 0;
+    margin-left: 0;
+    display: grid;
+    /* grid-template-columns: 1fr; */
+    grid-template-rows: min-content 1fr min-content;
+}
+
+.header {
+    background-color: lightgray;
+    font-weight: bold;
+    border-bottom: 1px solid grey;
+}
+
+.header__controls {
+    display: grid;
+    grid-column-gap: 10px;
+    grid-template-columns: min-content min-content min-content min-content auto;
+}
+
+.button {
+    background-color: green;
+    border: none;
+    border-radius: 8px;
+    color: white;
+    /* padding: 15px 32px; */
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 12px;
+    transition-duration: 0.4s;
+}
+
+.button:hover {
+    background-color: tomato;
+}
+
+.button:focus {
+    outline: none;
+}
+
+.restrictions {
+    text-align: right;
+    display: grid;
+    grid-template-columns: repeat(12,min-content) auto;
+    grid-column-gap: 5px;
+}
+.restriction__label {
+    color: black;
+    font-weight: bold;
+    background-color: lightgray;
+}
+.restriction__cell {
+    color: white;
+    border: 2px solid black;
+}
+.restriction__legend {
+    display: grid;
+    grid-template-columns: repeat(7, min-content);
+    grid-column-gap: 5px;
+}
+.restriction__box {
+    border: 2px solid black;
+}
+
+.messages {
+    background-color: black;
+    color: olive;
+    font-weight: bold;
+    border-right: 1px solid white;
+    overflow-y: scroll;
+}
+
+.footer {
+    border-top: 1px solid grey;
+    background-color: lightgray;
+    text-align: right;
+    padding: 5px 10px;
+}
+
+.body {
+    width: 100vw;
+    display: grid;
+    grid-template-columns: 1fr 5fr;
+    overflow: hidden;
+}
+
+.main {
+    background-color: white;
+    overflow-y: scroll;
+    padding: 20px;
+    grid-template-rows: min-content 5px auto;
+}
+
+.positive {
+    color: green;
+    font-weight: bold;
+}
+
+.negative {
+    color: red;
+    font-weight: bold;
+}
+
+.currencies {
+    background-color: yellow;
+}
+
+.exchanges {
+    background-color: yellow;
+}
+
+.exchange__restrictions {
+    display: grid;
+    grid-template-columns: repeat(8,min-content);
+    grid-column-gap: 5px;
+}
+
+.two__forms {
+    width: 100vw;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    grid-template-rows: min-content 30px auto;
+}
+
+.two__forms__block {
+    border: 2px solid black;
+    border-radius: 8px;
+}
+
+.market__name {
+    padding-left: 0;
+    color: blue;
+    font-weight: bold;
+}
+
+.strategy__name {
+    padding-left: 10px;
+    color: black;
+    font-weight:normal;
+}
+
+/* p { */
+/*     max-width: 600px; */
+/* } */

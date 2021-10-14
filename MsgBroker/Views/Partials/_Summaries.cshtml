@@ -1,0 +1,50 @@
+﻿<div class="currencies">
+    <h3>Currency groups info</h3>
+    <div id="curapp">
+        <table>
+            <tr>
+                <th style="width: 100px;">Currency</th>
+                <th style="width: 100px;">UPL</th>
+                <th style="width: 100px;">RPL</th>
+            </tr>
+            <tr v-for="summary in items">
+                <td>{{summary.Currency}}</td>
+                <td :class="{positive: summary.UPL >= 0, negative: summary.UPL < 0}">{{summary.UPL}}</td>
+                <td :class="{positive: summary.RPL >= 0, negative: summary.RPL < 0}">{{summary.RPL}}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+<div><hr /></div>
+<div class="exchanges">
+    <h3>Exchange summaries</h3>
+    <div id="exapp">
+        <table>
+            <tr>
+                <th style="width: 150px;">Name</th>
+                <th style="width: 100px;">Currency</th>
+                <th style="width: 100px;">UPL</th>
+                <th style="width: 100px;">RPL</th>
+                <th style="width: 100px;"></th>
+                <th>Current restrictions</th>
+            </tr>
+            <tr v-for="summary in items">
+                <td>{{summary.Name}}</td>
+                <td>{{summary.Currency}}</td>
+                <td :class="{positive: summary.UPL >= 0, negative: summary.UPL < 0}">{{summary.UPL}}</td>
+                <td :class="{positive: summary.RPL >= 0, negative: summary.RPL < 0}">{{summary.RPL}}</td>
+                <td><button class="button" v-on:click="javascript:GlobalApp.DoPost(summary.Name)">Details...</button></td>
+                <td class="exchange__restrictions">
+                    <div class="restriction__cell" :style="summary.userStyle">User</div>
+                    <div class="restriction__cell" :style="summary.schedStyle">Shed</div>
+                    <div class="restriction__cell" :style="summary.lossStyle">Loss</div>
+                    <div class="restriction__cell" :style="summary.parStyle">Parent</div>
+                    <div class="restriction__cell" :style="summary.contrStyle">Contract</div>
+                    <div class="restriction__cell" :style="summary.sessStyle">Session</div>
+                    <div class="restriction__cell" :style="summary.errStyle">Errors</div>
+                    <div class="restriction__cell" :style="summary.mktStyle">Market</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>

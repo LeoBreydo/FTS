@@ -1,0 +1,64 @@
+﻿<div class="currencies">
+    <h3>Exchange summary</h3>
+    <div id="edapp">
+        <table>
+            <tr>
+                <th style="width: 100px;">Currency</th>
+                <th style="width: 100px;">UPL</th>
+                <th style="width: 100px;">RPL</th>
+                <th style="width: 200px;">Info</th>
+            </tr>
+            <tr>
+                <td>{{Currency}}</td>
+                <td :class="{positive: UPL >= 0, negative: UPL < 0}">{{UPL}}</td>
+                <td :class="{positive: RPL >= 0, negative: RPL < 0}">{{RPL}}</td>
+                <td>{{Info}}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+<div><hr /></div>
+<div class="exchanges">
+    <h3>Markets/Strategies summaries</h3>
+    <div id="msapp">
+        <table>
+            <tr>
+                <th style="width: 200px;">Name</th>
+                <th style="width: 100px;">UPL</th>
+                <th style="width: 100px;">RPL</th>
+                <th style="width: 100px;">Position</th>
+                <th style="width: 100px;">Sess.Result</th>
+                <th>Info</th>
+                <th style="width: 100px;"></th>
+                <th style="width: 80px;"></th>
+                <th style="width: 80px;"></th>
+                <th>Current&nbsp;Restrictions</th>
+            </tr>
+            <tr v-for="summary in items">
+                <td :class="{market__name: summary.Type == 2, strategy__name: summary.Type == 3}">{{summary.Name}}</td>
+                <td :class="{positive: summary.UPL >= 0, negative: summary.UPL < 0}">{{summary.UPL}}</td>
+                <td :class="{positive: summary.RPL >= 0, negative: summary.RPL < 0}">{{summary.RPL}}</td>
+                <td :class="{positive: summary.Position >= 0, negative: summary.Position < 0}">{{summary.Position}}</td>
+                <td :class="{positive: summary.SessionResult >= 0, negative: summary.SessionResult < 0}">{{summary.SessionResult}}</td>
+                <td>{{summary.Info}}</td>
+                <td>
+                    <div style="margin-left:40%">
+                        <button class="button" v-on:click="javascript:DetailsApp.Message(summary.Id, 0, summary.Type)">Start</button>
+                    </div>
+                </td>
+                <td><button class="button" v-on:click="javascript:DetailsApp.Message(summary.Id, 1, summary.Type)">SoftStop</button></td>
+                <td><button class="button" v-on:click="javascript:DetailsApp.Message(summary.Id, 2, summary.Type)">HardStop</button></td>
+                <td class="exchange__restrictions">
+                    <div class="restriction__cell" :style="summary.userStyle">User</div>
+                    <div class="restriction__cell" :style="summary.schedStyle">Shed</div>
+                    <div class="restriction__cell" :style="summary.lossStyle">Loss</div>
+                    <div class="restriction__cell" :style="summary.parStyle">Parent</div>
+                    <div class="restriction__cell" :style="summary.contrStyle">Contract</div>
+                    <div class="restriction__cell" :style="summary.sessStyle">Session</div>
+                    <div class="restriction__cell" :style="summary.errStyle">Errors</div>
+                    <div class="restriction__cell" :style="summary.mktStyle">Market</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+</div>

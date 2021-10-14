@@ -1,0 +1,32 @@
+﻿@{
+    ViewData["Title"] = "Global";
+}
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="stylesheet" href="~/css/site.css">
+<body>
+    <div class="container">
+        <partial name="~/Views/Partials/_GlobHeader.cshtml" />
+        <div class="body">
+            <partial name="~/Views/Partials/_MessageFeed.cshtml" />
+            <div class="main">
+                <partial name="~/Views/Partials/_Summaries.cshtml" />
+            </div>
+        </div>
+        <div class="footer">Binosoft &copy; 2021&nbsp;&nbsp;&nbsp;</div>
+    </div>
+</body>
+@section scripts {
+    <script src="~/js/signalr/dist/browser/signalr.js"></script>
+    <script src="~/lib/jquery/dist/jquery.js"></script>
+    <script src="~/js/vue.min.js"></script>
+    <script type="text/javascript" src="~/scripts/appg.js"></script>
+    <script>
+        var viewModel;
+        var userId = "@ViewBag.UserId";
+        var userTicket = "@ViewBag.UserTicket";
+        var accountId = "Global";
+        $(function () {
+            GlobalApp.start();
+        });
+    </script>
+}

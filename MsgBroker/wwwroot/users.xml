@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AllUsers xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <AdminLogin>admin</AdminLogin>
+  <AdminPassword>345</AdminPassword>
+  <Users>
+    <UserInfo>
+      <Login>Trader</Login>
+      <Password>Trader</Password>
+    </UserInfo>
+    <UserInfo>
+      <Login>trader</Login>
+      <Password>trader</Password>
+    </UserInfo>
+  </Users>
+</AllUsers>

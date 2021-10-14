@@ -1,0 +1,66 @@
+﻿@{
+    ViewData["Title"] = "Administrator tools";
+}
+
+<link rel="stylesheet" href="~/css/site.css">
+
+<div class="two__forms">
+    <div></div>
+    <div class="two__forms__block">
+        <p style="font-weight:lighter; font-style:italic">(Change admin credentials)</p>
+        <div id="centerLayer">
+            @using (Html.BeginForm("Show", "Home", new { id = "Change_Admin_credentials" }))
+            {
+                <table>
+                    <tr>
+                        <td>New login :    </td>
+                        <td>@Html.TextBox("Login", "", new { @placeholder = "Enter login" })</td>
+                    </tr>
+                    <tr>
+                        <td>New password : </td>
+                        <td>@Html.Password("Password", "", new { @placeholder = "Enter password"})</td>
+                    </tr>
+                    <tr><td><p></p></td><td></td></tr>
+                    <tr>
+                        <td><input type="submit" name="selector" value="Change admin credentials" /></td>
+                    </tr>
+                </table>
+            }
+        </div>
+    </div>
+    <div></div>
+
+    <div></div>
+    <div></div>
+    <div></div>
+
+    <div></div>
+    <div class="two__forms__block">
+        <p style="font-weight:lighter; font-style:italic">(Add new user)</p>
+        <div id="centerLayer">
+            @using (Html.BeginForm("Show", "Home", new { id = "Add_new_user" }))
+            {
+                <table>
+                    <tr>
+                        <td>New login : </td>
+                        <td>@Html.TextBox("Login", "", new { @placeholder = "Enter login"})</td>
+                    </tr>
+                    <tr>
+                        <td>New password : </td>
+                        <td>@Html.Password("Password", "", new { @placeholder = "Enter password" })</td>
+                    </tr>
+                    <tr>
+                        <td>
+                            <p></p>
+                        </td>
+                        <td></td>
+                    </tr>
+                    <tr>
+                        <td><input type="submit" name="selector" value="Add new user" /></td>
+                    </tr>
+                </table>
+            }
+        </div>
+    </div>
+    <div></div>
+</div>
