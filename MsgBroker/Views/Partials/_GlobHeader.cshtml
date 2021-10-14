@@ -1,5 +1,6 @@
 ﻿<div class="header">
     <div class="header__controls" id="grapp">
+        <div class="led-box"><div class="led-light" :class="connected ? 'led-green' : 'led-red'"></div></div>
         <div>GLOBAL&nbsp;: </div>
         <button class="button" v-on:click="javascript:GlobalApp.Message(Id, 0, 0)">Start</button>
         <button class="button" v-on:click="javascript:GlobalApp.Message(Id, 1, 0)">SoftStop</button>

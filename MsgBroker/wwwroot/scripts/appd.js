@@ -22,7 +22,8 @@ var grapp = new Vue({
         errStyle: { backgroundColor: "green" },
         mktStyle: { backgroundColor: "black" },
         error_nbr: 0,
-        Id: 0
+        Id: 0,
+        connected: false
     }
 });
 
@@ -85,6 +86,7 @@ DetailsApp.set_grapp_data = function (state_object) {
     });
     grapp.error_nbr = state_object.DayErrorNbr;
     grapp.Id = state_object.Id;
+    grapp.connected = state_object.IsConnected;
 }
 
 DetailsApp.set_edapp_data = function (state_object) {

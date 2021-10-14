@@ -4,10 +4,6 @@
   <AdminPassword>345</AdminPassword>
   <Users>
     <UserInfo>
-      <Login>Trader</Login>
-      <Password>Trader</Password>
-    </UserInfo>
-    <UserInfo>
       <Login>trader</Login>
       <Password>trader</Password>
     </UserInfo>

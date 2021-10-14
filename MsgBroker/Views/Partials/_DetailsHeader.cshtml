@@ -1,6 +1,7 @@
 ﻿<div class="header">
-    <div class="header__controls"  id="grapp">
-        <div >@ViewBag.ExchangeNameToDisplay&nbsp;: </div>
+    <div class="header__controls" id="grapp">
+        <div class="led-box"><div class="led-light" :class="connected ? 'led-green' : 'led-red'"></div></div>
+        <div>@ViewBag.ExchangeNameToDisplay&nbsp;: </div>
         <button class="button" v-on:click="javascript:DetailsApp.Message(Id, 0, 1)">Start</button>
         <button class="button" v-on:click="javascript:DetailsApp.Message(Id, 1, 1)">SoftStop</button>
         <button class="button" v-on:click="javascript:DetailsApp.Message(Id, 2, 1)">HardStop</button>

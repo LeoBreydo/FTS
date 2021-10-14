@@ -38,8 +38,12 @@ namespace MsgBroker.Services
                     if (_state != null)
                     {
                         _state.Summary.MessagesToShow = new List<Message> { new() { Tag = "Attention!", Body = "Service unavailable!" } };
+                        _state.Summary.IsConnected = false;
                         foreach (var ed in _state.Details.Values)
+                        {
                             ed.MessagesToShow = new List<Message> { new() { Tag = "Attention!", Body = "Service unavailable!" } };
+                            ed.IsConnected = false;
+                        }
                     }
                 }
                 else _state = serverState;

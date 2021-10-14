@@ -28,12 +28,13 @@ html, body {
     background-color: lightgray;
     font-weight: bold;
     border-bottom: 1px solid grey;
+    padding: 2px;
 }
 
 .header__controls {
     display: grid;
     grid-column-gap: 10px;
-    grid-template-columns: min-content min-content min-content min-content auto;
+    grid-template-columns: min-content min-content min-content min-content min-content auto;
 }
 
 .button {
@@ -158,6 +159,26 @@ html, body {
     font-weight:normal;
 }
 
-/* p { */
-/*     max-width: 600px; */
-/* } */
+/* connection indicator */
+.led-box {
+    height: 24px;
+    width: 100%;
+    margin: 0;
+}
+
+.led-light {
+    margin: 0 auto;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+}
+
+.led-red {
+    background-color: #f00;
+    box-shadow: rgba(0, 0, 0, 0.2) 0 -1px 7px 1px, inset #441313 0 -1px 9px, rgba(255, 0, 0, 0.5) 0 2px 12px;
+}
+
+.led-green {
+    background-color: #abff00;
+    box-shadow: rgba(0, 0, 0, 0.2) 0 -1px 7px 1px, inset #304701 0 -1px 9px, #89ff00 0 2px 12px;
+}
